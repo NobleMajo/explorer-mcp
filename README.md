@@ -6,8 +6,7 @@
 ![](https://img.shields.io/badge/dynamic/json?color=yellow&label=stars&query=stargazers_count&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2Fnoblemajo%2Fexplorer-mcp)
 ![](https://img.shields.io/badge/dynamic/json?color=navy&label=forks&query=forks&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2Fnoblemajo%2Fexplorer-mcp)
 
-`explorer-mcp` is a small, read-only MCP server that provides AI with a fast Git repository, folder structure and other contextual information.
-It should reduce the time and token usage for initial and subsequent exploration by handling everything internally and passing it to AI agents.
+explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
  
 # Table of Contents
 - [Requirements](#requirements)
