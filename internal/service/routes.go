@@ -7,6 +7,7 @@ import (
 
 func registerRoutes(server *mcp.Server, cfg *config.AppConfig) {
 	_ = cfg
+	registerExploreTool(server)
 	registerRepoStructureTool(server)
 	registerGitOverviewTool(server)
 	registerDependenciesTool(server)
