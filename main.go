@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"errors"
+	"io"
+	"log"
 	"os"
 	"strings"
 
-	"github.com/NobleMajo/vault/internal/config"
-	"github.com/NobleMajo/vault/internal/subcmd"
-	"github.com/NobleMajo/vault/lib/stringfs"
+	"github.com/NobleMajo/explorer-mcp/internal/config"
+	"github.com/NobleMajo/explorer-mcp/internal/service"
 	"github.com/joho/godotenv"
 )
 
@@ -17,72 +18,23 @@ var Version string = "?.?.?"
 var Commit string = "???????"
 
 func main() {
+	_ = godotenv.Load()
+
 	appConfig := config.ParseConfig(DisplayName, ShortName, Version, Commit)
 
-	err := godotenv.Load()
-	if err == nil {
-		fmt.Println("Environment variables from .env loaded")
-	}
+	log.Printf(
+		"starting %s (%s) v%s build %s on MCP stdio\n",
+		DisplayName,
+		ShortName,
+		Version,
+		Commit,
+	)
 
-	stringfs.ParsePath(&appConfig.PublicKeyPath)
-	stringfs.ParsePath(&appConfig.PrivateKeyPath)
-	targetFile := targetFile(appConfig)
-
-	if appConfig.SubCommand == "lock" {
-		subcmd.LockOperation(
-			targetFile,
-			appConfig,
-		)
-	} else if appConfig.SubCommand == "init" {
-		subcmd.InitOperation(
-			targetFile,
-			appConfig,
-		)
-	} else if appConfig.SubCommand == "print" {
-		subcmd.PrintOperation(
-			targetFile,
-			appConfig,
-		)
-	} else if appConfig.SubCommand == "unlock" {
-		subcmd.UnlockOperation(
-			targetFile,
-			appConfig,
-		)
-	} else if appConfig.SubCommand == "temp" {
-		subcmd.TempOperation(
-			targetFile,
-			appConfig,
-		)
-	} else if appConfig.SubCommand == "passwd" {
-		subcmd.PasswdOperation(
-			targetFile,
-			appConfig,
-		)
-	} else {
-		fmt.Fprintf(
-			os.Stderr,
-			"%s: '"+appConfig.SubCommand+"' is not a command.\n"+
-				"See '%s help'",
-			os.Args[0],
-			os.Args[0],
-		)
-	}
-}
-
-func targetFile(
-	appConfig *config.AppConfig,
-) string {
-	if len(appConfig.Args) >= 1 {
-		targetFile := appConfig.Args[0]
-
-		if strings.HasSuffix(targetFile, "."+appConfig.VaultFileExtension) {
-			targetFile = targetFile[:len(targetFile)-len(appConfig.VaultFileExtension)-1]
-		} else if strings.HasSuffix(targetFile, "."+appConfig.PlainFileExtension) {
-			targetFile = targetFile[:len(targetFile)-len(appConfig.PlainFileExtension)-1]
+	if err := service.InitMcpService(appConfig, DisplayName, Version); err != nil {
+		if errors.Is(err, io.EOF) || strings.Contains(err.Error(), "EOF") {
+			return
 		}
-
-		return targetFile
+		log.Printf("MCP server failed: %v\n", err)
+		os.Exit(1)
 	}
-
-	return "vault"
 }

@@ -8,37 +8,18 @@ import (
 )
 
 type AppConfig struct {
-	Verbose             bool
-	ShowVersion         bool
-	ShowHelp            bool
-	PrivateKeyPath      string
-	PublicKeyPath       string
-	Args                []string
-	VaultFileExtension  string
-	PlainFileExtension  string
-	BackupFileExtension string
-	CleanPrint          bool
-	DisableRSA          bool
-	DisableAES256       bool
-	SubCommand          string
-	TempDecodeSeconds   int
+	Verbose     bool
+	ShowVersion bool
+	ShowHelp    bool
+	Args        []string
 }
 
 func defaultAppConfig() *AppConfig {
 	return &AppConfig{
-		Verbose:            false,
-		ShowVersion:        false,
-		ShowHelp:           false,
-		PrivateKeyPath:     "~/.ssh/id_rsa",
-		PublicKeyPath:      "~/.ssh/id_rsa.pub",
-		Args:               []string{},
-		VaultFileExtension: "vt",
-		PlainFileExtension: "txt",
-		CleanPrint:         false,
-		DisableRSA:         false,
-		DisableAES256:      false,
-		SubCommand:         "",
-		TempDecodeSeconds:  10,
+		Verbose:     false,
+		ShowVersion: false,
+		ShowHelp:    false,
+		Args:        []string{},
 	}
 }
 
@@ -55,175 +36,9 @@ func versionCommand(appConfig *AppConfig) *cobra.Command {
 	return cmd
 }
 
-func addCryptFlags(appConfig *AppConfig, cmd *cobra.Command) {
-	cmd.Flags().StringVarP(&appConfig.PrivateKeyPath, "private-key", "r", appConfig.PrivateKeyPath, "Defines the private key path (VAULT_PRIVATE_KEY_PATH)")
-	cmd.Flags().StringVarP(&appConfig.PublicKeyPath, "public-key", "u", appConfig.PublicKeyPath, "Defines the public key path (VAULT_PUBLIC_KEY_PATH)")
-	cmd.Flags().StringVarP(&appConfig.VaultFileExtension, "vault-ext", "e", appConfig.VaultFileExtension, "Defines the vault file extension (VAULT_EXT)")
-	cmd.Flags().StringVarP(&appConfig.PlainFileExtension, "plain-ext", "p", appConfig.PlainFileExtension, "Defines the plain file extension (VAULT_PLAIN_EXT)")
-	cmd.Flags().BoolVarP(&appConfig.DisableRSA, "no-rsa", "x", appConfig.DisableRSA, "Use RSA key encryption (VAULT_RSA)")
-	cmd.Flags().BoolVarP(&appConfig.DisableAES256, "no-aes", "a", appConfig.DisableAES256, "Use AES256 password encryption (VAULT_AES)")
-}
-
-func lockCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "lock",
-		Short: "Locks your plain file into a vault file",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "lock"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "loc")
-	cmd.Aliases = append(cmd.Aliases, "lo")
-	cmd.Aliases = append(cmd.Aliases, "l")
-
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
-func unlockCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "unlock",
-		Short: "Unlocks your vault file into a plain file",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "unlock"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "unloc")
-	cmd.Aliases = append(cmd.Aliases, "un")
-	cmd.Aliases = append(cmd.Aliases, "u")
-
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
-func passwdCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "passwd",
-		Short: "Changes the password of your vault file",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "passwd"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "passw")
-	cmd.Aliases = append(cmd.Aliases, "pass")
-	cmd.Aliases = append(cmd.Aliases, "pa")
-
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
-func tempCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "temp",
-		Short: "Temporary unlocks your vault file into a plain file",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "temp"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "tmp")
-	cmd.Aliases = append(cmd.Aliases, "tm")
-	cmd.Aliases = append(cmd.Aliases, "t")
-
-	cmd.Flags().IntVarP(&appConfig.TempDecodeSeconds, "temp-seconds", "t", appConfig.TempDecodeSeconds, "Temporary decode time in seconds (VAULT_TEMP_DECODE_SECONDS)")
-
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
-func printCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "print",
-		Short: "Prints the decrypted content of your vault file",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "print"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "prin")
-	cmd.Aliases = append(cmd.Aliases, "pr")
-	cmd.Aliases = append(cmd.Aliases, "p")
-
-	cmd.Flags().BoolVarP(&appConfig.CleanPrint, "clean-print", "c", appConfig.CleanPrint, "Clean print mode (VAULT_CLEAN_PRINT)")
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
-func initCommand(appConfig *AppConfig) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "init",
-		Short: "Create a initial encrypted vault file for default text",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.Args = args
-			appConfig.SubCommand = "init"
-		},
-	}
-
-	cmd.Aliases = append(cmd.Aliases, "ini")
-	cmd.Aliases = append(cmd.Aliases, "in")
-	cmd.Aliases = append(cmd.Aliases, "i")
-
-	addCryptFlags(appConfig, cmd)
-
-	return cmd
-}
-
 func loadEnvVars(appConfig *AppConfig) {
-	EnvIsString("VAULT_PRIVATE_KEY_PATH", func(value string) {
-		appConfig.PrivateKeyPath = value
-	})
-
-	EnvIsString("VAULT_PUBLIC_KEY_PATH", func(value string) {
-		appConfig.PublicKeyPath = value
-	})
-
-	EnvIsString("VAULT_EXT", func(value string) {
-		appConfig.VaultFileExtension = value
-	})
-
-	EnvIsString("VAULT_PLAIN_EXT", func(value string) {
-		appConfig.PlainFileExtension = value
-	})
-
-	EnvIsBool("VAULT_DISABLE_RSA", func(value bool) {
-		appConfig.DisableRSA = value
-	})
-
-	EnvIsBool("VAULT_RSA", func(value bool) {
-		appConfig.DisableRSA = !value
-	})
-
-	EnvIsBool("VAULT_DISABLE_AES", func(value bool) {
-		appConfig.DisableAES256 = value
-	})
-
-	EnvIsBool("VAULT_AES", func(value bool) {
-		appConfig.DisableAES256 = !value
-	})
-
-	EnvIsBool("VAULT_VERBOSE", func(value bool) {
+	EnvIsBool("VERBOSE", func(value bool) {
 		appConfig.Verbose = value
-	})
-
-	EnvIsBool("VAULT_CLEAN_PRINT", func(value bool) {
-		appConfig.CleanPrint = value
-	})
-
-	EnvIsInt("VAULT_TEMP_DECODE_SECONDS", func(value int) {
-		appConfig.TempDecodeSeconds = value
 	})
 }
 
@@ -236,28 +51,20 @@ func ParseConfig(
 	appConfig := defaultAppConfig()
 
 	rootCmd := &cobra.Command{
-		Use: "vault",
-		Short: "Vault is a file encryption and decryption cli tool written in go.\n" +
-			"For more help, visit https://github.com/NobleMajo/vault",
-		Run: func(cmd *cobra.Command, args []string) {
-			appConfig.ShowHelp = true
-		},
+		Use: shortName,
+		Short: displayName + " is a read-only MCP server for Git repository exploration.\n" +
+			"For more help, visit https://github.com/NobleMajo/explorer-mcp",
+		Run: func(cmd *cobra.Command, args []string) {},
 	}
 
-	rootCmd.PersistentFlags().BoolVarP(&appConfig.Verbose, "verbose", "b", appConfig.Verbose, "enable verbose mode (VAULT_VERBOSE)")
+	rootCmd.PersistentFlags().BoolVarP(&appConfig.Verbose, "verbose", "b", appConfig.Verbose, "enable verbose mode (VERBOSE)")
 	rootCmd.Flags().BoolVarP(&appConfig.ShowVersion, "version", "v", appConfig.ShowVersion, "prints version")
+
+	loadEnvVars(appConfig)
 
 	rootCmd.AddCommand(
 		versionCommand(appConfig),
-		initCommand(appConfig),
-		printCommand(appConfig),
-		lockCommand(appConfig),
-		unlockCommand(appConfig),
-		tempCommand(appConfig),
-		passwdCommand(appConfig),
 	)
-
-	loadEnvVars(appConfig)
 
 	err := rootCmd.Execute()
 	if err != nil {
@@ -266,7 +73,7 @@ func ParseConfig(
 	}
 
 	if appConfig.Verbose {
-		fmt.Println("Verbose mode enabled")
+		fmt.Fprintln(os.Stderr, "Verbose mode enabled")
 	}
 
 	if appConfig.ShowVersion {
@@ -276,10 +83,6 @@ func ParseConfig(
 
 	if appConfig.ShowHelp {
 		rootCmd.Help()
-		os.Exit(0)
-	}
-
-	if appConfig.SubCommand == "" {
 		os.Exit(0)
 	}
 
