@@ -102,7 +102,7 @@ func parseGitStatusShort(output string) []gitChangedFile {
 	lines := strings.Split(output, "\n")
 	files := make([]gitChangedFile, 0, len(lines))
 	for _, line := range lines {
-		line = strings.TrimSpace(line)
+		line = strings.TrimRight(line, " \t")
 		if line == "" {
 			continue
 		}
