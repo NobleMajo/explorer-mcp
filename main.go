@@ -24,24 +24,20 @@ func main() {
 	appConfig := config.ParseConfig(DisplayName, ShortName, Version, Commit)
 
 	if appConfig.PrintAll {
-		out, err := service.DirectJsonResult(appConfig)
+		projectRoot := ""
+		if len(appConfig.Args) > 0 {
+			projectRoot = appConfig.Args[0]
+		} else {
+			projectRoot = "."
+		}
+
+		out, err := service.DirectJsonResultAt(appConfig, projectRoot)
 		if err != nil {
 			log.Printf("print raw exploration json failed: %v\n", err)
 			os.Exit(1)
 		}
 
-		if appConfig.Verbose {
-			log.Printf(
-				"Print raw exploration json of %s (%s) v%s build %s\n",
-				DisplayName,
-				ShortName,
-				Version,
-				Commit,
-			)
-			log.Println(out)
-		} else {
-			fmt.Println(out)
-		}
+		fmt.Println(out)
 
 		os.Exit(0)
 	}

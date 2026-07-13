@@ -24,7 +24,7 @@ func writeOpencodeCLIStub(t *testing.T, binDir, body string) {
 func TestOpencodeOverviewNilWhenCLINotInPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
-	result, err := OpencodeOverview()(false)
+	result, err := OpencodeOverview()(t.TempDir(), false)
 	if err != nil {
 		t.Fatalf("OpencodeOverview() error: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestOpencodeOverviewNilWhenDebugAgentFails(t *testing.T) {
 	writeOpencodeCLIStub(t, binDir, "#!/bin/sh\nexit 1\n")
 	t.Setenv("PATH", binDir)
 
-	result, err := OpencodeOverview()(false)
+	result, err := OpencodeOverview()(t.TempDir(), false)
 	if err != nil {
 		t.Fatalf("OpencodeOverview() error: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestOpencodeOverviewFromDebugAgentBuild(t *testing.T) {
 	writeOpencodeCLIStub(t, binDir, "#!/bin/sh\nif [ \"$1\" = debug ] && [ \"$2\" = agent ] && [ \"$3\" = build ]; then echo '"+stubAgentJSON+"'; fi\n")
 	t.Setenv("PATH", binDir)
 
-	result, err := OpencodeOverview()(false)
+	result, err := OpencodeOverview()(t.TempDir(), false)
 	if err != nil {
 		t.Fatalf("OpencodeOverview() error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestOpencodeOverviewEmptyMCPWhenOnlyNativeTools(t *testing.T) {
 	writeOpencodeCLIStub(t, binDir, "#!/bin/sh\nif [ \"$1\" = debug ] && [ \"$2\" = agent ] && [ \"$3\" = build ]; then echo '{\"permission\":[{\"permission\":\"*\",\"pattern\":\"*\",\"action\":\"allow\"}],\"tools\":{\"bash\":true,\"read\":true}}'; fi\n")
 	t.Setenv("PATH", binDir)
 
-	result, err := OpencodeOverview()(false)
+	result, err := OpencodeOverview()(t.TempDir(), false)
 	if err != nil {
 		t.Fatalf("OpencodeOverview() error: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestOpencodeOverviewUsesProjectCwdWhenRealCLIAvailable(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	testutil.Chdir(t, root)
 
-	result, err := OpencodeOverview()(false)
+	result, err := OpencodeOverview()(root, false)
 	if err != nil {
 		t.Fatalf("OpencodeOverview() error: %v", err)
 	}

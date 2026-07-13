@@ -165,12 +165,12 @@ func TestExploreCombinesToolSections(t *testing.T) {
 		t.Fatalf("git init failed: %v\n%s", err, out)
 	}
 
-	jsonText, err := buildExploreResponse(testExploreSettingsAllSections(false))
+	jsonText, err := buildExploreResponse(root, testExploreSettingsAllSections(false))
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
 	}
 
-	jsonTextVerbose, err := buildExploreResponse(testExploreSettingsAllSections(true))
+	jsonTextVerbose, err := buildExploreResponse(root, testExploreSettingsAllSections(true))
 	if err != nil {
 		t.Fatalf("buildExploreResponse(true) error: %v", err)
 	}
@@ -217,7 +217,7 @@ func TestBuildExploreResponsePropagatesSectionError(t *testing.T) {
 	testutil.WriteFile(t, root+"/package.json", `{invalid`)
 	testutil.Chdir(t, root)
 
-	_, err := buildExploreResponse(testExploreSettingsAllSections(false))
+	_, err := buildExploreResponse(root, testExploreSettingsAllSections(false))
 	if err == nil {
 		t.Fatal("expected buildExploreResponse error from invalid package.json")
 	}
@@ -234,7 +234,7 @@ func TestBuildExploreResponseMakefileReadError(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	_, err := buildExploreResponse(testExploreSettingsAllSections(false))
+	_, err := buildExploreResponse(root, testExploreSettingsAllSections(false))
 	if err == nil {
 		t.Fatal("expected buildExploreResponse error from unreadable Makefile")
 	}
@@ -547,8 +547,9 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("embeds json", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection(func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		section, err := overviewSection("test-root", func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				if verbose {
 					t.Fatal("expected verbose false")
 				}
@@ -570,8 +571,9 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("passes verbose", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection(func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		section, err := overviewSection("test-root", func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				if !verbose {
 					t.Fatal("expected verbose true")
 				}
@@ -593,8 +595,9 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("propagates error", func(t *testing.T) {
 		t.Parallel()
-		_, err := overviewSection(func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		_, err := overviewSection("test-root", func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				_ = verbose
 				return nil, errors.New("section failed")
 			}
@@ -606,8 +609,9 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("marshal error", func(t *testing.T) {
 		t.Parallel()
-		_, err := overviewSection(func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		_, err := overviewSection("test-root", func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				_ = verbose
 				return make(chan int), nil
 			}
@@ -619,8 +623,9 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("nil result omits section", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection(func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		section, err := overviewSection("test-root", func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				_ = verbose
 				return nil, nil
 			}
@@ -639,8 +644,9 @@ func TestOptionalOverviewSection(t *testing.T) {
 
 	t.Run("disabled", func(t *testing.T) {
 		t.Parallel()
-		section, err := optionalOverviewSection(true, func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		section, err := optionalOverviewSection("test-root", true, func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				t.Fatal("overview should not run when disabled")
 				return nil, nil
 			}
@@ -655,8 +661,9 @@ func TestOptionalOverviewSection(t *testing.T) {
 
 	t.Run("enabled", func(t *testing.T) {
 		t.Parallel()
-		section, err := optionalOverviewSection(false, func() resource.OverviewResource {
-			return func(verbose bool) (any, error) {
+		section, err := optionalOverviewSection("test-root", false, func() resource.OverviewResource {
+			return func(projectRootPath string, verbose bool) (any, error) {
+				_ = projectRootPath
 				return map[string]bool{"ok": true}, nil
 			}
 		}, false)
@@ -794,7 +801,11 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			jsonText, err := buildExploreResponse(tc.settings)
+			root := t.TempDir()
+			testutil.WriteFile(t, root+"/main.go", "package main\n")
+			testutil.Chdir(t, root)
+
+			jsonText, err := buildExploreResponse(root, tc.settings)
 			if err != nil {
 				t.Fatalf("buildExploreResponse() error: %v", err)
 			}
@@ -809,7 +820,7 @@ func TestBuildExploreResponseSkipsBehaviorHintsForUnavailableSections(t *testing
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		repoScanDepth:             6,
 		enableBehaviorInstruction: true,
 	})
@@ -848,7 +859,7 @@ func TestBuildExploreResponseOpencodeDisabledByDefault(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	jsonText, err := buildExploreResponse(exploreSettings{repoScanDepth: 6})
+	jsonText, err := buildExploreResponse(root, exploreSettings{repoScanDepth: 6})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
 	}
@@ -867,7 +878,7 @@ func TestBuildExploreResponseOpencodeOmittedWithoutCLI(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		enableOpencodeOverview: true,
 		repoScanDepth:          6,
 	})
@@ -896,7 +907,7 @@ func TestBuildExploreResponseOpencodePresentWithCLI(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", binDir)
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		enableOpencodeOverview:      true,
 		disableStructureOverview:    true,
 		disableGitOverview:          true,
@@ -919,7 +930,8 @@ func TestBuildExploreResponseOpencodePresentWithCLI(t *testing.T) {
 }
 
 func TestBuildExploreResponseAllOverviewsDisabledReturnsError(t *testing.T) {
-	_, err := buildExploreResponse(exploreSettings{
+	root := t.TempDir()
+	_, err := buildExploreResponse(root, exploreSettings{
 		disableStructureOverview:    true,
 		disableGitOverview:          true,
 		disableWorkspaceOverview:    true,
@@ -939,7 +951,7 @@ func TestBuildExploreResponseOmitsUnavailableSections(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	jsonText, err := buildExploreResponse(testExploreSettingsAllSections(false))
+	jsonText, err := buildExploreResponse(root, testExploreSettingsAllSections(false))
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
 	}
@@ -970,7 +982,7 @@ func TestBuildExploreResponseCliDisabledByDefault(t *testing.T) {
 		t.Fatalf("git init failed: %v\n%s", err, out)
 	}
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
 		repoScanDepth:     6,
@@ -1005,7 +1017,7 @@ func TestBuildExploreResponseOnlyCliEnabled(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", binDir)
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		disableStructureOverview:    true,
 		disableGitOverview:          true,
 		disableWorkspaceOverview:    true,
@@ -1040,7 +1052,7 @@ func TestBuildExploreResponseDisableStructureOverview(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		disableStructureOverview: true,
 		repoScanDepth:            6,
 	})
@@ -1062,7 +1074,7 @@ func TestBuildExploreResponseBehaviorDisabledByDefault(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
 		repoScanDepth:     0,
@@ -1097,7 +1109,7 @@ func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
 		t.Fatalf("git init failed: %v\n%s", err, out)
 	}
 
-	jsonText, err := buildExploreResponse(exploreSettings{
+	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
 		repoScanDepth:     0,

@@ -133,7 +133,7 @@ func TestProjectToolsMakefileReadError(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chmod(makefile, 0o644) })
 	testutil.Chdir(t, root)
 
-	_, err := ToolsOverview()(false)
+	_, err := ToolsOverview()(root, false)
 	if err == nil {
 		t.Fatal("expected error for unreadable Makefile")
 	}
@@ -145,7 +145,7 @@ func TestProjectToolsDetectsPackageJsonScripts(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := ToolsOverview()(false)
+	result, err := ToolsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("ToolsOverview() error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestProjectToolsDetectsMakefileTargets(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := ToolsOverview()(false)
+	result, err := ToolsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("ToolsOverview() error: %v", err)
 	}

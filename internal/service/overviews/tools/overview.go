@@ -18,12 +18,9 @@ type projectToolsResponse struct {
 	ScriptsFound map[string][]string `json:"scriptsFound,omitempty"`
 }
 
-func buildProjectTools(verbose bool) (projectToolsResponse, error) {
+func buildProjectTools(projectRootPath string, verbose bool) (projectToolsResponse, error) {
 	_ = verbose
-	root, err := os.Getwd()
-	if err != nil {
-		return projectToolsResponse{}, err
-	}
+	root := projectRootPath
 
 	toolsFound := make([]string, 0, 3)
 	scriptsFound := make(map[string][]string)

@@ -53,7 +53,7 @@ exit 1
 	}
 	t.Setenv("PATH", binDir)
 
-	result, err := ContainerOverview()(false)
+	result, err := ContainerOverview()(root, false)
 	if err != nil {
 		t.Fatalf("ContainerOverview() error: %v", err)
 	}
@@ -150,7 +150,7 @@ func TestContainerOverviewCLIsOnlyWhenNothingRunning(t *testing.T) {
 	}
 	t.Setenv("PATH", binDir)
 
-	result, err := ContainerOverview()(false)
+	result, err := ContainerOverview()(root, false)
 	if err != nil {
 		t.Fatalf("ContainerOverview() error: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestContainerOverviewEmptyWhenNoCLIs(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	result, err := ContainerOverview()(false)
+	result, err := ContainerOverview()(root, false)
 	if err != nil {
 		t.Fatalf("ContainerOverview() error: %v", err)
 	}

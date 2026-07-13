@@ -43,7 +43,7 @@ func TestCLIOverviewFindsToolsInPath(t *testing.T) {
 	}
 	t.Setenv("PATH", binDir)
 
-	result, err := CLIOverview()(false)
+	result, err := CLIOverview()("", false)
 	if err != nil {
 		t.Fatalf("CLIOverview() error: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestCLIOverviewFindsToolsInPath(t *testing.T) {
 func TestCLIOverviewEmptyWhenNoToolsInPath(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 
-	result, err := CLIOverview()(false)
+	result, err := CLIOverview()("", false)
 	if err != nil {
 		t.Fatalf("CLIOverview() error: %v", err)
 	}

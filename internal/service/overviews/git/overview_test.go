@@ -106,7 +106,7 @@ func TestGitOverviewWithoutGitRepo(t *testing.T) {
 	root := t.TempDir()
 	testutil.Chdir(t, root)
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestGitOverviewGitNotInPath(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestGitOverviewInsideGitRepo(t *testing.T) {
 	runGit(t, root, "init")
 	testutil.WriteFile(t, root+"/README.md", "demo\n")
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -170,7 +170,7 @@ func TestGitOverviewReportsRecentCommits(t *testing.T) {
 	runGit(t, root, "add", "README.md")
 	runGit(t, root, "commit", "-m", "init")
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -202,7 +202,7 @@ func TestGitOverviewSkipsRecentCommitsWhenZero(t *testing.T) {
 	runGit(t, root, "add", "README.md")
 	runGit(t, root, "commit", "-m", "init")
 
-	result, err := GitOverview(0)()(false)
+	result, err := GitOverview(0)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestGitOverviewDirtyWorkingTree(t *testing.T) {
 	runGit(t, root, "commit", "-m", "init")
 	testutil.WriteFile(t, root+"/README.md", "changed\n")
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestGitOverviewCommitCountIsFullHistory(t *testing.T) {
 	runGit(t, root, "add", "README.md")
 	runGit(t, root, "commit", "-m", "second")
 
-	result, err := GitOverview(1)()(false)
+	result, err := GitOverview(1)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestGitOverviewDetachedHead(t *testing.T) {
 	runGit(t, root, "commit", "-m", "init")
 	runGit(t, root, "checkout", "--detach")
 
-	result, err := GitOverview(10)()(false)
+	result, err := GitOverview(10)()(root, false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}

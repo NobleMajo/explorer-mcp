@@ -14,20 +14,15 @@ type repoStructureResponse struct {
 	Entries            []string `json:"entries,omitempty"`
 }
 
-func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse, error) {
+func buildRepoStructure(projectRootPath string, verbose bool, repoScanDepth int) (repoStructureResponse, error) {
 	_ = verbose
 	if repoScanDepth < 1 {
 		zero := 0
 		return repoStructureResponse{RepoScanDepthLimit: &zero}, nil
 	}
 
-	root, err := os.Getwd()
-	if err != nil {
-		return repoStructureResponse{}, err
-	}
-
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, repoScanDepth, &entries); err != nil {
+	if err := appendStructureEntries(projectRootPath, projectRootPath, 0, repoScanDepth, &entries); err != nil {
 		return repoStructureResponse{}, err
 	}
 

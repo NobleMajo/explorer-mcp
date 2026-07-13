@@ -35,7 +35,7 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestRepoStructureDepthZero(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(0)()(false)
+	result, err := StructureOverview(0)()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestRepoStructureIncludesScanDepthLimit(t *testing.T) {
 	testutil.Chdir(t, root)
 
 	const depth = 4
-	result, err := StructureOverview(depth)()(false)
+	result, err := StructureOverview(depth)()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -229,7 +229,7 @@ func TestRepoStructureDoesNotFollowGitIgnore(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -252,7 +252,7 @@ func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	testutil.WriteFile(t, root+"/.env.project", "PROJECT_VERSION=1.0.0\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}

@@ -51,7 +51,7 @@ type opencodeOverviewResponse struct {
 	MCP         []string `json:"mcp,omitempty"`
 }
 
-func buildOpencodeOverview(verbose bool) (any, error) {
+func buildOpencodeOverview(projectRootPath string, verbose bool) (any, error) {
 	logf := func(format string, args ...any) {
 		if !verbose {
 			return
@@ -64,14 +64,8 @@ func buildOpencodeOverview(verbose bool) (any, error) {
 		return nil, nil
 	}
 
-	dir, err := os.Getwd()
-	if err != nil {
-		logf("end status=error")
-		return nil, err
-	}
-
 	cmd := exec.Command(cliName, "debug", "agent", agentName)
-	cmd.Dir = dir
+	cmd.Dir = projectRootPath
 	logf("begin")
 	out, err := cmd.Output()
 	if err != nil {

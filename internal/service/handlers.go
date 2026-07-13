@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
@@ -37,14 +39,21 @@ func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 		Name:        "explore",
 		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct {
+		ProjectRootPath string `json:"projectRootPath"`
+	}) (*mcpsdk.CallToolResult, any, error) {
 		start := time.Now()
 		if settings.verbose {
 			_, _ = fmt.Fprintf(os.Stderr, "explore: request begin\n")
 		}
 
 		return jsonToolResult(func() (string, error) {
-			text, err := buildExploreResponse(settings)
+			projectRootPath := strings.TrimSpace(input.ProjectRootPath)
+			if projectRootPath == "" {
+				return "", fmt.Errorf("projectRootPath is required")
+			}
+
+			text, err := buildExploreResponse(projectRootPath, settings)
 			if settings.verbose {
 				if err != nil {
 					_, _ = fmt.Fprintf(os.Stderr, "explore: request end status=error dur=%s\n", time.Since(start))
@@ -84,7 +93,7 @@ type exploreResponse struct {
 	AgentBehaviorInstructions    map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
 
-func buildExploreResponse(settings exploreSettings) (string, error) {
+func buildExploreResponse(projectRootPath string, settings exploreSettings) (string, error) {
 	if !settings.hasEnabledOverview() {
 		return "", ErrAllOverviewsDisabled
 	}
@@ -96,10 +105,22 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		_, _ = fmt.Fprintf(os.Stderr, "explore: "+format+"\n", args...)
 	}
 
-	projectRoot, err := os.Getwd()
+	projectRootPath = strings.TrimSpace(projectRootPath)
+	if projectRootPath == "" {
+		return "", fmt.Errorf("projectRootPath is required")
+	}
+
+	projectRootAbs, err := filepath.Abs(projectRootPath)
 	if err != nil {
-		logf("getwd failed: %v", err)
-		return "", err
+		logf("projectRootPath abs failed")
+		return "", fmt.Errorf("invalid projectRootPath")
+	}
+	projectRootAbs = filepath.Clean(projectRootAbs)
+
+	info, err := os.Stat(projectRootAbs)
+	if err != nil || !info.IsDir() {
+		logf("projectRootPath invalid or not dir")
+		return "", fmt.Errorf("projectRootPath must be existing directory")
 	}
 
 	runSection := func(name string, disabled bool, fn func() resource.OverviewResource) (json.RawMessage, error) {
@@ -109,7 +130,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		}
 		logf("%s: begin", name)
 		start := time.Now()
-		section, err := overviewSection(fn, settings.verbose)
+		section, err := overviewSection(projectRootAbs, fn, settings.verbose)
 		dur := time.Since(start)
 		if err != nil {
 			logf("%s: end status=error dur=%s", name, dur)
@@ -179,7 +200,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 			ToolName:      "explore",
 			SchemaVersion: jsonresp.SchemaVersion,
 		},
-		ProjectRootPath: projectRoot,
+		ProjectRootPath: projectRootAbs,
 		Structure:       sections.structure,
 		Git:             sections.git,
 		Workspace:       sections.workspace,
@@ -336,15 +357,15 @@ func hasProjectToolsData(projectTools json.RawMessage) bool {
 	return false
 }
 
-func optionalOverviewSection(disabled bool, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
+func optionalOverviewSection(projectRootPath string, disabled bool, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
 	if disabled {
 		return nil, nil
 	}
-	return overviewSection(fn, verbose)
+	return overviewSection(projectRootPath, fn, verbose)
 }
 
-func overviewSection(fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
-	result, err := fn()(verbose)
+func overviewSection(projectRootPath string, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
+	result, err := fn()(projectRootPath, verbose)
 	if err != nil {
 		return nil, err
 	}

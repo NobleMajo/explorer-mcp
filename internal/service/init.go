@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 
 	"github.com/NobleMajo/explorer-mcp/internal/config"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -14,5 +15,13 @@ func InitMcpService(cfg *config.AppConfig, name, version string) error {
 }
 
 func DirectJsonResult(cfg *config.AppConfig) (string, error) {
-	return buildExploreResponse(exploreSettingsFromConfig(cfg))
+	root, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	return DirectJsonResultAt(cfg, root)
+}
+
+func DirectJsonResultAt(cfg *config.AppConfig, projectRootPath string) (string, error) {
+	return buildExploreResponse(projectRootPath, exploreSettingsFromConfig(cfg))
 }

@@ -12,12 +12,9 @@ type workspaceContextResponse struct {
 	SiblingProjects     []string `json:"siblingProjects,omitempty"`
 }
 
-func buildWorkspaceContext(verbose bool, settings ScanSettings) (workspaceContextResponse, error) {
+func buildWorkspaceContext(projectRootPath string, verbose bool, settings ScanSettings) (workspaceContextResponse, error) {
 	_ = verbose
-	cwd, err := os.Getwd()
-	if err != nil {
-		return workspaceContextResponse{}, err
-	}
+	cwd := projectRootPath
 
 	resp := workspaceContextResponse{
 		ParentScanPerformed: settings.Depth > 0,

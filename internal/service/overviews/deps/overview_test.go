@@ -14,7 +14,7 @@ func TestDependenciesFindsManifests(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestDependenciesDetectOnlyManifests(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -58,7 +58,7 @@ func TestDependenciesRequirementsTxt(t *testing.T) {
 	testutil.WriteFile(t, root+"/requirements.txt", "flask>=3.0.0\n")
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -81,7 +81,7 @@ func TestDependenciesAllManifestLoaders(t *testing.T) {
 	testutil.WriteFile(t, root+"/pyproject.toml", "[project]\nname = \"demo\"\n")
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestDependenciesSkipsMissingManifests(t *testing.T) {
 	root := t.TempDir()
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestDependenciesGoModLoaderError(t *testing.T) {
 	testutil.WriteFile(t, root+"/go.mod", "")
 	testutil.Chdir(t, root)
 
-	result, err := DepsOverview()(false)
+	result, err := DepsOverview()(root, false)
 	if err != nil {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
@@ -145,7 +145,7 @@ func TestDependenciesLoaderError(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	_, err := DepsOverview()(false)
+	_, err := DepsOverview()(root, false)
 	if err == nil {
 		t.Fatal("expected error for invalid package.json")
 	}

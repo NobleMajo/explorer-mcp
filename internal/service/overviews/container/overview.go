@@ -2,7 +2,6 @@ package container
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"slices"
 	"sort"
@@ -16,12 +15,9 @@ type containerOverviewResponse struct {
 	ContainerFound map[string][]string `json:"containerFound,omitempty"`
 }
 
-func buildContainerOverview(verbose bool) (any, error) {
+func buildContainerOverview(projectRootPath string, verbose bool) (any, error) {
 	_ = verbose
-	root, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
+	root := projectRootPath
 
 	cliFound := detectAvailableContainerCLIs()
 	if len(cliFound) == 0 {

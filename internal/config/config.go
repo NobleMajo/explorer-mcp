@@ -71,8 +71,9 @@ func versionCommand(appConfig *AppConfig) *cobra.Command {
 
 func printCommand(appConfig *AppConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "print",
+		Use:   "print [projectRootPath]",
 		Short: "Prints the raw exploration json",
+		Args:  cobra.MaximumNArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			appConfig.Args = args
 			appConfig.PrintAll = true

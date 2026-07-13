@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -25,12 +24,9 @@ type gitOverviewResponse struct {
 	ErrorMessage            string   `json:"errorMessage,omitempty"`
 }
 
-func buildGitOverview(verbose bool, recentCommitCount int) (any, error) {
+func buildGitOverview(projectRootPath string, verbose bool, recentCommitCount int) (any, error) {
 	_ = verbose
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
+	dir := projectRootPath
 
 	if _, err := exec.LookPath("git"); err != nil {
 		return nil, nil
