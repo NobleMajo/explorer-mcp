@@ -8,7 +8,7 @@
 
 explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
 
-*Why should an AI agent collect context piece by piece when an MCP can collect more information faster and present it in a simple, self-explanatory, compact format?
+*Why should an AI agent collect context piece by piece when an MCP can collect more information faster and present it in a simple, self-explanatory, compact format?*
 
 # Table of Contents
 - [Explore resources](#explore-resources)
