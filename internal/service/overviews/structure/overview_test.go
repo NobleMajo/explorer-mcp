@@ -246,6 +246,33 @@ func TestRepoStructureDoesNotFollowGitIgnore(t *testing.T) {
 	}
 }
 
+func TestRepoStructureSkipsDotDirectories(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/.cursor/rules", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/.cursor/rules/demo.mdc", "rule\n")
+	testutil.WriteFile(t, root+"/.env", "PORT=8080\n")
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(testRepoScanDepth)()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	names := entryBaseNames(resp.Entries)
+	if slices.Contains(names, "demo.mdc") {
+		t.Fatalf("expected dot dir contents skipped, entries=%v", resp.Entries)
+	}
+	for _, want := range []string{"main.go", ".env"} {
+		if !slices.Contains(names, want) {
+			t.Fatalf("expected %q in entries, got %v", want, names)
+		}
+	}
+}
+
 func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/.env", "PORT=8080\n")

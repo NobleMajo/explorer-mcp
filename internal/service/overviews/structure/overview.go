@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
@@ -56,6 +57,9 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 		if globals.IsScanIgnored(entry.Name()) {
 			continue
 		}
+		if entry.IsDir() && isDotDir(entry.Name()) {
+			continue
+		}
 
 		fullPath := filepath.Join(dir, entry.Name())
 		relPath, err := filepath.Rel(root, fullPath)
@@ -100,6 +104,9 @@ func hasVisibleDescendants(dir string) (bool, error) {
 		if globals.IsScanIgnored(entry.Name()) {
 			continue
 		}
+		if entry.IsDir() && isDotDir(entry.Name()) {
+			continue
+		}
 
 		if !entry.IsDir() {
 			if globals.IsIgnoredFile(entry.Name()) {
@@ -119,4 +126,8 @@ func hasVisibleDescendants(dir string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func isDotDir(name string) bool {
+	return strings.HasPrefix(name, ".")
 }
