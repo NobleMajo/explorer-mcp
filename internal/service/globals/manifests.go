@@ -4,32 +4,23 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 )
 
-func LoadGoModManifest(root, manifestPath string) (EcosystemResult, error) {
+func LoadGoModManifest(root, manifestPath string) ([]string, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return EcosystemResult{}, err
+		return nil, err
 	}
 
-	deps := parseGoModRequire(string(data))
-	return EcosystemResult{
-		EcosystemName:      "go",
-		ManifestFilePath:   "go.mod",
-		ManifestFileExists: true,
-		IsParsed:           true,
-		DependencyCount:    len(deps),
-		Dependencies:       deps,
-	}, nil
+	return parseGoModRequire(string(data)), nil
 }
 
-func LoadPackageJsonManifest(root, manifestPath string) (EcosystemResult, error) {
+func LoadPackageJsonManifest(root, manifestPath string) ([]string, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return EcosystemResult{}, err
+		return nil, err
 	}
 
 	var pkg struct {
@@ -37,40 +28,29 @@ func LoadPackageJsonManifest(root, manifestPath string) (EcosystemResult, error)
 		DevDependencies map[string]string `json:"devDependencies"`
 	}
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return EcosystemResult{}, err
+		return nil, err
 	}
 
-	groups := make([]DependencyGroup, 0, 2)
-	if len(pkg.Dependencies) > 0 {
-		groups = append(groups, DependencyGroup{
-			GroupName:    "dependencies",
-			PackageNames: sortedManifestKeys(pkg.Dependencies),
-		})
+	entries := make([]string, 0, len(pkg.Dependencies)+len(pkg.DevDependencies))
+	for name, version := range pkg.Dependencies {
+		entries = append(entries, formatNodeDependency(name, version, "production"))
 	}
-	if len(pkg.DevDependencies) > 0 {
-		groups = append(groups, DependencyGroup{
-			GroupName:    "devDependencies",
-			PackageNames: sortedManifestKeys(pkg.DevDependencies),
-		})
+	for name, version := range pkg.DevDependencies {
+		entries = append(entries, formatNodeDependency(name, version, "development"))
 	}
 
-	return EcosystemResult{
-		EcosystemName:      "node",
-		ManifestFilePath:   "package.json",
-		ManifestFileExists: true,
-		IsParsed:           true,
-		DependencyGroups:   groups,
-	}, nil
+	sort.Strings(entries)
+	return entries, nil
 }
 
-func LoadRequirementsManifest(root, manifestPath string) (EcosystemResult, error) {
+func LoadRequirementsManifest(root, manifestPath string) ([]string, error) {
 	file, err := os.Open(manifestPath)
 	if err != nil {
-		return EcosystemResult{}, err
+		return nil, err
 	}
 	defer file.Close()
 
-	names := make([]string, 0)
+	entries := make([]string, 0)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -83,69 +63,60 @@ func LoadRequirementsManifest(root, manifestPath string) (EcosystemResult, error
 		if line == "" {
 			continue
 		}
-		name := line
-		if before, _, ok := strings.Cut(line, "=="); ok {
-			name = strings.TrimSpace(before)
-		} else if before, _, ok := strings.Cut(line, ">="); ok {
-			name = strings.TrimSpace(before)
-		}
-		names = append(names, name)
+		entries = append(entries, formatPythonDependency(line))
 	}
 	if err := scanner.Err(); err != nil {
-		return EcosystemResult{}, err
+		return nil, err
 	}
 
-	sort.Strings(names)
-
-	return EcosystemResult{
-		EcosystemName:      "python",
-		ManifestFilePath:   "requirements.txt",
-		ManifestFileExists: true,
-		IsParsed:           true,
-		DependencyGroups: []DependencyGroup{{
-			GroupName:    "requirements",
-			PackageNames: names,
-		}},
-	}, nil
+	sort.Strings(entries)
+	return entries, nil
 }
 
-func LoadCargoManifest(root, manifestPath string) (EcosystemResult, error) {
-	return detectOnlyManifestResult(manifestPath, "full TOML parsing not in v1")
-}
-
-func LoadPyprojectManifest(root, manifestPath string) (EcosystemResult, error) {
-	return detectOnlyManifestResult(manifestPath, "full TOML parsing not in v1")
-}
-
-func detectOnlyManifestResult(manifestPath, reason string) (EcosystemResult, error) {
-	return EcosystemResult{
-		EcosystemName:      ecosystemNameForManifest(manifestPath),
-		ManifestFilePath:   filepath.Base(manifestPath),
-		ManifestFileExists: true,
-		IsParsed:           false,
-		ParseSkipReason:    reason,
-	}, nil
-}
-
-func ecosystemNameForManifest(manifestPath string) string {
-	switch filepath.Base(manifestPath) {
-	case "go.mod":
-		return "go"
-	case "package.json":
-		return "node"
-	case "requirements.txt", "pyproject.toml":
-		return "python"
-	case "Cargo.toml":
-		return "rust"
-	default:
-		return "unknown"
+func LoadCargoManifest(root, manifestPath string) ([]string, error) {
+	_, err := os.Stat(manifestPath)
+	if err != nil {
+		return nil, err
 	}
+	return nil, nil
 }
 
-func parseGoModRequire(content string) []GoDependency {
+func LoadPyprojectManifest(root, manifestPath string) ([]string, error) {
+	_, err := os.Stat(manifestPath)
+	if err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func formatGoModuleDependency(name, version string, indirect bool) string {
+	scope := "direct"
+	if indirect {
+		scope = "indirect"
+	}
+	return name + "@" + version + " " + scope
+}
+
+func formatNodeDependency(name, version, scope string) string {
+	return name + "@" + version + " " + scope
+}
+
+func formatPythonDependency(line string) string {
+	operators := []string{"==", ">=", "<=", "~=", "!=", ">", "<"}
+	for _, op := range operators {
+		if idx := strings.Index(line, op); idx > 0 {
+			name := strings.TrimSpace(line[:idx])
+			constraint := strings.TrimSpace(line[idx:])
+			return name + "@" + constraint
+		}
+	}
+	return strings.TrimSpace(line)
+}
+
+func parseGoModRequire(content string) []string {
 	lines := strings.Split(content, "\n")
 	inBlock := false
-	deps := make([]GoDependency, 0)
+	entries := make([]string, 0)
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -163,39 +134,32 @@ func parseGoModRequire(content string) []GoDependency {
 		}
 
 		if inBlock {
-			if dep, ok := parseGoModRequireLine(trimmed); ok {
-				deps = append(deps, dep)
+			if entry, ok := parseGoModRequireLine(trimmed); ok {
+				entries = append(entries, entry)
 			}
 			continue
 		}
 
 		if strings.HasPrefix(trimmed, "require ") {
-			if dep, ok := parseGoModRequireLine(strings.TrimPrefix(trimmed, "require ")); ok {
-				deps = append(deps, dep)
+			if entry, ok := parseGoModRequireLine(strings.TrimPrefix(trimmed, "require ")); ok {
+				entries = append(entries, entry)
 			}
 		}
 	}
 
-	sort.Slice(deps, func(i, j int) bool {
-		return deps[i].PackageName < deps[j].PackageName
-	})
-
-	return deps
+	sort.Strings(entries)
+	return entries
 }
 
-func parseGoModRequireLine(line string) (GoDependency, bool) {
+func parseGoModRequireLine(line string) (string, bool) {
 	isIndirect := strings.Contains(line, "// indirect")
 	line = strings.Split(line, "//")[0]
 	fields := strings.Fields(strings.TrimSpace(line))
 	if len(fields) < 2 {
-		return GoDependency{}, false
+		return "", false
 	}
 
-	return GoDependency{
-		PackageName: fields[0],
-		Version:     fields[1],
-		IsIndirect:  isIndirect,
-	}, true
+	return formatGoModuleDependency(fields[0], fields[1], isIndirect), true
 }
 
 func sortedManifestKeys(m map[string]string) []string {

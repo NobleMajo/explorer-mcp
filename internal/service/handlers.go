@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"os"
 
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/container"
@@ -51,6 +52,7 @@ var AgentBehaviorInstruction = map[string]string{
 
 type exploreResponse struct {
 	responseMeta
+	ProjectRootPath     string            `json:"projectRootPath"`
 	RepoStructure       json.RawMessage   `json:"repoStructure"`
 	GitOverview         json.RawMessage   `json:"gitOverview"`
 	WorkspaceContext    json.RawMessage   `json:"workspaceContext"`
@@ -61,6 +63,11 @@ type exploreResponse struct {
 }
 
 func buildExploreResponse(verbose bool) (string, error) {
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
 	repoStructure, err := overviewSection(structure.StructureOverview, verbose)
 	if err != nil {
 		return "", err
@@ -105,6 +112,7 @@ func buildExploreResponse(verbose bool) (string, error) {
 			ToolName:      "explore",
 			SchemaVersion: jsonresp.SchemaVersion,
 		},
+		ProjectRootPath:     projectRoot,
 		RepoStructure:       sections.repoStructure,
 		GitOverview:         sections.gitOverview,
 		WorkspaceContext:    sections.workspaceContext,
@@ -174,19 +182,16 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		return json.Unmarshal(sections.gitOverview, &git) == nil && git.IsGitRepo
 	case "parent":
 		var parent struct {
-			SiblingProjects []struct {
-				RelativePath string `json:"relativePath"`
-			} `json:"siblingProjects"`
+			GitSiblingProjects []string `json:"gitSiblingProjects"`
+			SiblingProjects    []string `json:"siblingProjects"`
 		}
 		if json.Unmarshal(sections.workspaceContext, &parent) != nil {
 			return false
 		}
-		return len(parent.SiblingProjects) > 0
+		return len(parent.GitSiblingProjects) > 0 || len(parent.SiblingProjects) > 0
 	case "deps":
-		var deps struct {
-			EcosystemCount int `json:"ecosystemCount"`
-		}
-		return json.Unmarshal(sections.dependencies, &deps) == nil && deps.EcosystemCount > 0
+		var deps []string
+		return json.Unmarshal(sections.dependencies, &deps) == nil && len(deps) > 0
 	case "container":
 		return hasContainerOverviewData(sections.containerOverview)
 	case "tools":

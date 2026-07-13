@@ -9,14 +9,11 @@ import (
 	"strings"
 
 	"github.com/NobleMajo/explorer-mcp/internal/fsutil"
-	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 )
 
 var makefileTargetNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
 type projectToolsResponse struct {
-	jsonresp.Meta
-	ProjectRootPath        string   `json:"projectRootPath"`
 	HasMakefile            bool     `json:"hasMakefile"`
 	MakefileTargetCount    int      `json:"makefileTargetCount"`
 	MakefileTargetNames    []string `json:"makefileTargetNames"`
@@ -35,11 +32,6 @@ func buildProjectTools(verbose bool) (projectToolsResponse, error) {
 	}
 
 	resp := projectToolsResponse{
-		Meta: jsonresp.Meta{
-			ToolName:      "project_tools",
-			SchemaVersion: jsonresp.SchemaVersion,
-		},
-		ProjectRootPath:        root,
 		MakefileTargetNames:    []string{},
 		PackageJsonScriptNames: []string{},
 		ShellScriptPaths:       []string{},

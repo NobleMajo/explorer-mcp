@@ -103,9 +103,6 @@ func TestContainerOverviewIntegration(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "container_overview" {
-		t.Fatalf("toolName = %q", resp.ToolName)
-	}
 	if !resp.IsDockerAvailable || !resp.IsPodmanAvailable {
 		t.Fatalf("expected both runtimes available, got docker=%v podman=%v", resp.IsDockerAvailable, resp.IsPodmanAvailable)
 	}

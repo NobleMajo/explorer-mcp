@@ -40,15 +40,15 @@ func TestListSiblingProjects(t *testing.T) {
 	}
 	testutil.WriteFile(t, filepath.Join(parent, "notes.txt"), "ignore me\n")
 
-	got, err := listSiblingProjects(parent, current)
+	gitSiblings, siblings, err := listSiblingProjects(parent, current)
 	if err != nil {
 		t.Fatalf("listSiblingProjects() error: %v", err)
 	}
-	if len(got) != 1 {
-		t.Fatalf("len(siblings) = %d, want 1", len(got))
+	if len(gitSiblings) != 1 || len(siblings) != 0 {
+		t.Fatalf("gitSiblings=%v siblings=%v, want [../beta] and []", gitSiblings, siblings)
 	}
-	if got[0].RelativePath != "../beta" || !got[0].IsGitRepo {
-		t.Fatalf("unexpected beta sibling: %+v", got[0])
+	if gitSiblings[0] != "../beta" {
+		t.Fatalf("git sibling = %q, want ../beta", gitSiblings[0])
 	}
 }
 
@@ -74,17 +74,14 @@ func TestWorkspaceContext(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "workspace_context" {
-		t.Fatalf("toolName = %q", resp.ToolName)
-	}
 	if resp.CurrentWorkingDirectoryPath != current || resp.ParentDirectoryPath != parent {
 		t.Fatalf("unexpected paths: cwd=%q parent=%q", resp.CurrentWorkingDirectoryPath, resp.ParentDirectoryPath)
 	}
-	if resp.SiblingProjectCount != 1 || len(resp.SiblingProjects) != 1 {
-		t.Fatalf("unexpected siblings: %+v", resp.SiblingProjects)
+	if resp.SiblingProjectCount != 1 || len(resp.GitSiblingProjects) != 0 || len(resp.SiblingProjects) != 1 {
+		t.Fatalf("unexpected siblings: git=%v other=%v", resp.GitSiblingProjects, resp.SiblingProjects)
 	}
-	if resp.SiblingProjects[0].RelativePath != "../other" {
-		t.Fatalf("relativePath = %q, want ../other", resp.SiblingProjects[0].RelativePath)
+	if resp.SiblingProjects[0] != "../other" {
+		t.Fatalf("relativePath = %q, want ../other", resp.SiblingProjects[0])
 	}
 }
 
@@ -107,7 +104,7 @@ func TestWorkspaceContextUnreadableParent(t *testing.T) {
 }
 
 func TestListSiblingProjectsMissingParent(t *testing.T) {
-	_, err := listSiblingProjects("/does/not/exist", "/does/not/exist/child")
+	_, _, err := listSiblingProjects("/does/not/exist", "/does/not/exist/child")
 	if err == nil {
 		t.Fatal("expected error for missing parent directory")
 	}

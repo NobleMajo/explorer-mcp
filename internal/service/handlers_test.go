@@ -20,7 +20,7 @@ func TestLimitJSONOutput(t *testing.T) {
 
 	t.Run("under cap", func(t *testing.T) {
 		t.Parallel()
-		input := `{"toolName":"repo_structure","schemaVersion":1,"entryCount":1}`
+		input := `{"entryCount":1}`
 		got, err := limitJSONOutput(input)
 		if err != nil {
 			t.Fatalf("limitJSONOutput() error: %v", err)
@@ -32,7 +32,7 @@ func TestLimitJSONOutput(t *testing.T) {
 
 	t.Run("over cap", func(t *testing.T) {
 		t.Parallel()
-		input := `{"toolName":"repo_structure","schemaVersion":1,"payload":"` + strings.Repeat("x", maxToolJSONBytes) + `"}`
+		input := `{"payload":"` + strings.Repeat("x", maxToolJSONBytes) + `"}`
 
 		got, err := limitJSONOutput(input)
 		if err != nil {
@@ -46,9 +46,6 @@ func TestLimitJSONOutput(t *testing.T) {
 
 		if !resp.IsOutputTruncated {
 			t.Fatal("expected isOutputTruncated true")
-		}
-		if resp.ToolName != "repo_structure" {
-			t.Fatalf("toolName = %q, want repo_structure", resp.ToolName)
 		}
 		if resp.OutputByteCount <= maxToolJSONBytes {
 			t.Fatalf("outputByteCount = %d, want > %d", resp.OutputByteCount, maxToolJSONBytes)
@@ -159,13 +156,20 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	if resp.ToolName != "explore" {
 		t.Fatalf("toolName = %q", resp.ToolName)
 	}
+	if resp.ProjectRootPath != root {
+		t.Fatalf("projectRootPath = %q, want %q", resp.ProjectRootPath, root)
+	}
 
-	assertSectionToolName(t, "repoStructure", resp.RepoStructure, "repo_structure")
-	assertSectionToolName(t, "gitOverview", resp.GitOverview, "git_overview")
-	assertSectionToolName(t, "workspaceContext", resp.WorkspaceContext, "workspace_context")
-	assertSectionToolName(t, "dependencies", resp.Dependencies, "dependencies")
-	assertSectionToolName(t, "containerOverview", resp.ContainerOverview, "container_overview")
-	assertSectionToolName(t, "projectTools", resp.ProjectTools, "project_tools")
+	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "entryCount")
+	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "rootPath")
+	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "projectRootPath")
+	assertSectionHasField(t, "gitOverview", resp.GitOverview, "isGitAvailable")
+	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "currentWorkingDirectoryPath")
+	assertSectionIsJSONArray(t, "dependencies", resp.Dependencies)
+	assertSectionHasField(t, "containerOverview", resp.ContainerOverview, "detectedContainerFileCount")
+	assertSectionMissingField(t, "containerOverview", resp.ContainerOverview, "projectRootPath")
+	assertSectionHasField(t, "projectTools", resp.ProjectTools, "makefileTargetCount")
+	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "projectRootPath")
 
 	for _, want := range []string{"general", "structure", "git", "parent", "deps", "container", "tools"} {
 		if _, ok := resp.BehaviorInstruction[want]; !ok {
@@ -217,8 +221,8 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 	instructions := buildAgentBehaviorInstructions(exploreSections{
 		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 0}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{}}),
-		dependencies:      mustRawJSON(t, map[string]any{"ecosystemCount": 0}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"gitSiblingProjects": []string{}, "siblingProjects": []string{}}),
+		dependencies:      mustRawJSON(t, []string{}),
 		containerOverview: mustRawJSON(t, map[string]any{}),
 		projectTools:      mustRawJSON(t, map[string]any{}),
 	})
@@ -277,9 +281,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "parent",
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
-					"siblingProjects": []map[string]any{
-						{"relativePath": "../other"},
-					},
+					"siblingProjects": []string{"../other"},
 				}),
 			},
 			want: true,
@@ -289,7 +291,8 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "parent",
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
-					"siblingProjects": []map[string]any{},
+					"gitSiblingProjects": []string{},
+					"siblingProjects":    []string{},
 				}),
 			},
 			want: false,
@@ -298,7 +301,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "deps with ecosystems",
 			domain: "deps",
 			sect: exploreSections{
-				dependencies: mustRawJSON(t, map[string]any{"ecosystemCount": 1}),
+				dependencies: mustRawJSON(t, []string{"demo@1.0.0 direct"}),
 			},
 			want: true,
 		},
@@ -306,7 +309,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "deps empty",
 			domain: "deps",
 			sect: exploreSections{
-				dependencies: mustRawJSON(t, map[string]any{"ecosystemCount": 0}),
+				dependencies: mustRawJSON(t, []string{}),
 			},
 			want: false,
 		},
@@ -394,7 +397,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "deps invalid json",
 			domain: "deps",
 			sect: exploreSections{
-				dependencies: json.RawMessage("{"),
+				dependencies: json.RawMessage("["),
 			},
 			want: false,
 		},
@@ -491,8 +494,8 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 	sections := exploreSections{
 		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 1}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{{"relativePath": "../other"}}}),
-		dependencies:      mustRawJSON(t, map[string]any{"ecosystemCount": 1}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []string{"../other"}}),
+		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 direct"}),
 		containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
 		projectTools:      mustRawJSON(t, map[string]any{"makefileTargetCount": 1}),
 	}
@@ -539,22 +542,19 @@ func TestOverviewSection(t *testing.T) {
 				if verbose {
 					t.Fatal("expected verbose false")
 				}
-				return responseMeta{
-					ToolName:      "demo",
-					SchemaVersion: jsonresp.SchemaVersion,
-				}, nil
+				return map[string]int{"entryCount": 1}, nil
 			}
 		}, false)
 		if err != nil {
 			t.Fatalf("overviewSection() error: %v", err)
 		}
 
-		var meta responseMeta
-		if err := json.Unmarshal(section, &meta); err != nil {
+		var sectionData map[string]int
+		if err := json.Unmarshal(section, &sectionData); err != nil {
 			t.Fatalf("unmarshal section: %v", err)
 		}
-		if meta.ToolName != "demo" {
-			t.Fatalf("toolName = %q", meta.ToolName)
+		if sectionData["entryCount"] != 1 {
+			t.Fatalf("entryCount = %d", sectionData["entryCount"])
 		}
 	})
 
@@ -565,22 +565,19 @@ func TestOverviewSection(t *testing.T) {
 				if !verbose {
 					t.Fatal("expected verbose true")
 				}
-				return responseMeta{
-					ToolName:      "verbose_demo",
-					SchemaVersion: jsonresp.SchemaVersion,
-				}, nil
+				return map[string]bool{"verbose": true}, nil
 			}
 		}, true)
 		if err != nil {
 			t.Fatalf("overviewSection() error: %v", err)
 		}
 
-		var meta responseMeta
-		if err := json.Unmarshal(section, &meta); err != nil {
+		var sectionData map[string]bool
+		if err := json.Unmarshal(section, &sectionData); err != nil {
 			t.Fatalf("unmarshal section: %v", err)
 		}
-		if meta.ToolName != "verbose_demo" {
-			t.Fatalf("toolName = %q", meta.ToolName)
+		if !sectionData["verbose"] {
+			t.Fatal("expected verbose true in section payload")
 		}
 	})
 
@@ -621,14 +618,35 @@ func mustRawJSON(t *testing.T, v any) json.RawMessage {
 	return data
 }
 
-func assertSectionToolName(t *testing.T, field string, raw json.RawMessage, want string) {
+func assertSectionIsJSONArray(t *testing.T, field string, raw json.RawMessage) {
 	t.Helper()
 
-	var meta responseMeta
-	if err := json.Unmarshal(raw, &meta); err != nil {
+	var section []json.RawMessage
+	if err := json.Unmarshal(raw, &section); err != nil {
+		t.Fatalf("unmarshal %s as array: %v", field, err)
+	}
+}
+
+func assertSectionMissingField(t *testing.T, field string, raw json.RawMessage, unwantedField string) {
+	t.Helper()
+
+	var section map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &section); err != nil {
 		t.Fatalf("unmarshal %s: %v", field, err)
 	}
-	if meta.ToolName != want {
-		t.Fatalf("%s toolName = %q, want %q", field, meta.ToolName, want)
+	if _, ok := section[unwantedField]; ok {
+		t.Fatalf("%s should not include field %q", field, unwantedField)
+	}
+}
+
+func assertSectionHasField(t *testing.T, field string, raw json.RawMessage, wantField string) {
+	t.Helper()
+
+	var section map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &section); err != nil {
+		t.Fatalf("unmarshal %s: %v", field, err)
+	}
+	if _, ok := section[wantField]; !ok {
+		t.Fatalf("%s missing field %q", field, wantField)
 	}
 }

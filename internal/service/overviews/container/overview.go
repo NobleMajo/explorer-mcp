@@ -9,13 +9,10 @@ import (
 	"strings"
 
 	"github.com/NobleMajo/explorer-mcp/internal/fsutil"
-	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
 
 type containerOverviewResponse struct {
-	jsonresp.Meta
-	ProjectRootPath            string             `json:"projectRootPath"`
 	IsDockerAvailable          bool               `json:"isDockerAvailable"`
 	IsPodmanAvailable          bool               `json:"isPodmanAvailable"`
 	AvailableContainerCLICount int                `json:"availableContainerCLICount"`
@@ -41,14 +38,9 @@ func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
 	}
 
 	resp := containerOverviewResponse{
-		Meta: jsonresp.Meta{
-			ToolName:      "container_overview",
-			SchemaVersion: jsonresp.SchemaVersion,
-		},
 		DetectedContainerFilePaths: []string{},
 		RunningContainers:          []runningContainer{},
 		AvailableContainerCLINames: []string{},
-		ProjectRootPath:            root,
 	}
 
 	availableCLIs := detectAvailableContainerCLIs()

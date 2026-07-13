@@ -41,15 +41,12 @@ func TestManifestLoadersInvokeAll(t *testing.T) {
 		"pyproject.toml":   "[project]\nname = \"demo\"\n",
 	}
 
-	expected := map[string]struct {
-		ecosystem string
-		parsed    bool
-	}{
-		"go.mod":           {ecosystem: "go", parsed: true},
-		"package.json":     {ecosystem: "node", parsed: true},
-		"requirements.txt": {ecosystem: "python", parsed: true},
-		"Cargo.toml":       {ecosystem: "rust", parsed: false},
-		"pyproject.toml":   {ecosystem: "python", parsed: false},
+	expected := map[string][]string{
+		"go.mod":           {"github.com/foo/bar@v1.0.0 direct"},
+		"package.json":     {"left-pad@1.0.0 production"},
+		"requirements.txt": {"flask@>=3.0.0"},
+		"Cargo.toml":       nil,
+		"pyproject.toml":   nil,
 	}
 
 	fileNames := make([]string, 0, len(ManifestLoaders))
@@ -77,17 +74,13 @@ func TestManifestLoadersInvokeAll(t *testing.T) {
 		}
 
 		want := expected[fileName]
-		if got.EcosystemName != want.ecosystem {
-			t.Fatalf("%q ecosystem = %q, want %q", fileName, got.EcosystemName, want.ecosystem)
+		if len(got) != len(want) {
+			t.Fatalf("%q dependencies = %v, want %v", fileName, got, want)
 		}
-		if got.ManifestFilePath != fileName {
-			t.Fatalf("%q manifest path = %q, want %q", fileName, got.ManifestFilePath, fileName)
-		}
-		if !got.ManifestFileExists {
-			t.Fatalf("%q manifestFileExists = false", fileName)
-		}
-		if got.IsParsed != want.parsed {
-			t.Fatalf("%q isParsed = %v, want %v", fileName, got.IsParsed, want.parsed)
+		for _, entry := range want {
+			if !slices.Contains(got, entry) {
+				t.Fatalf("%q missing dependency %q in %v", fileName, entry, got)
+			}
 		}
 	}
 }

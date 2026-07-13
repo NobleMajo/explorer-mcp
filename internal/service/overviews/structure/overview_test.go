@@ -43,14 +43,11 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "repo_structure" {
-		t.Fatalf("unexpected meta: %+v", resp.Meta)
-	}
 	if resp.EntryCount != len(resp.Entries) {
 		t.Fatalf("entryCount = %d, len(entries) = %d", resp.EntryCount, len(resp.Entries))
 	}
 
-	names := entryNames(resp.Entries)
+	names := entryBaseNames(resp.Entries)
 	for _, forbidden := range append(slices.Clone(globals.ScanIgnoreFiles), "ignored.txt", "ignored-output", "skip.txt", "notes.tmp") {
 		if slices.Contains(names, forbidden) {
 			t.Fatalf("expected %q to be ignored, entries=%v", forbidden, names)
@@ -61,12 +58,9 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 			t.Fatalf("expected %q in entries, got %v", required, names)
 		}
 	}
-	for _, entry := range resp.Entries {
-		if entry.IsDirectory {
-			t.Fatalf("expected files only, got directory entry %+v", entry)
-		}
-		if strings.HasSuffix(entry.RelativePath, "/") {
-			t.Fatalf("expected file path, got directory path %q", entry.RelativePath)
+	for _, path := range resp.Entries {
+		if strings.HasSuffix(path, "/") {
+			t.Fatalf("expected file path, got directory path %q", path)
 		}
 	}
 }
@@ -80,7 +74,7 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	testutil.WriteFile(t, root+"/adir/afile.go", "package a\n")
 	testutil.WriteFile(t, root+"/afile.go", "package a\n")
 
-	entries := make([]structureEntry, 0)
+	entries := make([]string, 0)
 	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
@@ -90,14 +84,11 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	}
 
 	fileNames := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDirectory {
-			t.Fatalf("expected files only, got directory %+v", entry)
+	for _, path := range entries {
+		if strings.Contains(path, "/") && strings.HasSuffix(path, "/") {
+			t.Fatalf("unexpected directory path %q", path)
 		}
-		if strings.Contains(entry.RelativePath, "/") && strings.HasSuffix(entry.RelativePath, "/") {
-			t.Fatalf("unexpected directory path %q", entry.RelativePath)
-		}
-		fileNames = append(fileNames, entry.EntryName)
+		fileNames = append(fileNames, filepathBaseName(path))
 	}
 	if !slices.IsSorted(fileNames) {
 		t.Fatalf("files not sorted: %v", fileNames)
@@ -115,15 +106,16 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 		testutil.WriteFile(t, deep+"/file.go", "package x\n")
 	}
 
-	entries := make([]structureEntry, 0)
+	entries := make([]string, 0)
 	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
 	maxDepth := 0
-	for _, entry := range entries {
-		if entry.Depth > maxDepth {
-			maxDepth = entry.Depth
+	for _, path := range entries {
+		depth := strings.Count(path, "/") + 1
+		if depth > maxDepth {
+			maxDepth = depth
 		}
 	}
 	if maxDepth > globals.StructureScanMaxDepth {
@@ -149,7 +141,7 @@ func TestRepoStructureFollowsGitIgnore(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	names := entryNames(resp.Entries)
+	names := entryBaseNames(resp.Entries)
 	for _, forbidden := range []string{"build", "out.go", "app.log"} {
 		if slices.Contains(names, forbidden) {
 			t.Fatalf("expected %q to be gitignored, entries=%v", forbidden, names)
@@ -181,7 +173,7 @@ func TestRepoStructureNestedGitIgnore(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	names := entryNames(resp.Entries)
+	names := entryBaseNames(resp.Entries)
 	for _, forbidden := range []string{"generated", "skip.go"} {
 		if slices.Contains(names, forbidden) {
 			t.Fatalf("expected %q to be gitignored, entries=%v", forbidden, names)
@@ -217,7 +209,7 @@ func TestRepoStructureFollowGitIgnoreDisabled(t *testing.T) {
 
 	resp := result.(repoStructureResponse)
 
-	names := entryNames(resp.Entries)
+	names := entryBaseNames(resp.Entries)
 	if !slices.Contains(names, "out.go") {
 		t.Fatalf("expected out.go when gitignore disabled, entries=%v", names)
 	}
@@ -238,13 +230,9 @@ func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	paths := make([]string, 0, len(resp.Entries))
-	for _, entry := range resp.Entries {
-		paths = append(paths, entry.RelativePath)
-	}
 	for _, want := range []string{".env", ".env.project"} {
-		if !slices.Contains(paths, want) {
-			t.Fatalf("expected %q in entries, got %v", want, paths)
+		if !slices.Contains(resp.Entries, want) {
+			t.Fatalf("expected %q in entries, got %v", want, resp.Entries)
 		}
 	}
 }
@@ -256,12 +244,12 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 		testutil.WriteFile(t, root+"/"+fileName, "# ignore rules\n")
 	}
 
-	entries := make([]structureEntry, 0)
+	entries := make([]string, 0)
 	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
-	names := entryNames(entries)
+	names := entryBaseNames(entries)
 	for _, fileName := range globals.IgnoreFiles {
 		if slices.Contains(names, fileName) {
 			t.Fatalf("expected %q to be skipped, entries=%v", fileName, names)
@@ -273,17 +261,24 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 }
 
 func TestAppendStructureEntriesMissingDir(t *testing.T) {
-	entries := make([]structureEntry, 0)
+	entries := make([]string, 0)
 	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, &entries, newScanState())
 	if err == nil {
 		t.Fatal("expected error for missing directory")
 	}
 }
 
-func entryNames(entries []structureEntry) []string {
+func entryBaseNames(entries []string) []string {
 	names := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		names = append(names, entry.EntryName)
+	for _, path := range entries {
+		names = append(names, filepathBaseName(path))
 	}
 	return names
+}
+
+func filepathBaseName(path string) string {
+	if i := strings.LastIndex(path, "/"); i >= 0 {
+		return path[i+1:]
+	}
+	return path
 }

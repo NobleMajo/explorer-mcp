@@ -49,7 +49,7 @@ var KnownContainerRuntimeCLINames = []string{
 	"nerdctl",
 }
 
-type ManifestLoader func(root, manifestPath string) (EcosystemResult, error)
+type ManifestLoader func(root, manifestPath string) ([]string, error)
 
 var ManifestLoaders = map[string]ManifestLoader{
 	"go.mod":           LoadGoModManifest,

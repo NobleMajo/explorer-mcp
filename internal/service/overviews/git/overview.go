@@ -4,12 +4,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 )
 
 type gitOverviewResponse struct {
-	jsonresp.Meta
 	IsGitAvailable          bool             `json:"isGitAvailable"`
 	IsGitRepo               bool             `json:"isGitRepo"`
 	IsInsideWorkTree        bool             `json:"isInsideWorkTree"`
@@ -18,21 +15,11 @@ type gitOverviewResponse struct {
 	DetachedHeadCommitHash  string           `json:"detachedHeadCommitHash"`
 	IsWorkingTreeClean      bool             `json:"isWorkingTreeClean"`
 	ChangedFileCount        int              `json:"changedFileCount"`
-	ChangedFiles            []gitChangedFile `json:"changedFiles"`
+	ChangedFiles            []string         `json:"changedFiles"`
 	RecentCommitCount       int              `json:"recentCommitCount"`
-	RecentCommits           []gitCommit      `json:"recentCommits"`
-	UnstagedDiffStatSummary string           `json:"unstagedDiffStatSummary"`
+	RecentCommits           []string         `json:"recentCommits"`
+	UnstagedDiffStatSummary []string         `json:"unstagedDiffStatSummary"`
 	ErrorMessage            string           `json:"errorMessage,omitempty"`
-}
-
-type gitChangedFile struct {
-	StatusCode string `json:"statusCode"`
-	FilePath   string `json:"filePath"`
-}
-
-type gitCommit struct {
-	ShortCommitHash string `json:"shortCommitHash"`
-	CommitSubject   string `json:"commitSubject"`
 }
 
 func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
@@ -43,12 +30,9 @@ func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
 	}
 
 	resp := gitOverviewResponse{
-		Meta: jsonresp.Meta{
-			ToolName:      "git_overview",
-			SchemaVersion: jsonresp.SchemaVersion,
-		},
-		ChangedFiles:  []gitChangedFile{},
-		RecentCommits: []gitCommit{},
+		ChangedFiles:            []string{},
+		RecentCommits:           []string{},
+		UnstagedDiffStatSummary: []string{},
 	}
 
 	if _, err := exec.LookPath("git"); err != nil {
@@ -82,7 +66,8 @@ func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
 	resp.RecentCommits = parseGitLog(logOut)
 	resp.RecentCommitCount = len(resp.RecentCommits)
 
-	resp.UnstagedDiffStatSummary, _ = gitOutput(dir, "diff", "--stat")
+	statOut, _ := gitOutput(dir, "diff", "--stat")
+	resp.UnstagedDiffStatSummary = parseDiffStatSummary(statOut)
 
 	return resp, nil
 }
@@ -97,52 +82,100 @@ func gitOutput(dir string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func parseGitStatusShort(output string) []gitChangedFile {
+func parseGitStatusShort(output string) []string {
 	if output == "" {
-		return []gitChangedFile{}
+		return []string{}
 	}
 
 	lines := strings.Split(output, "\n")
-	files := make([]gitChangedFile, 0, len(lines))
+	files := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimRight(line, " \t")
-		if line == "" {
+		if len(line) < 3 {
 			continue
 		}
 
-		statusCode := line
-		filePath := ""
-		if len(line) >= 3 {
-			statusCode = line[:2]
-			filePath = strings.TrimSpace(line[2:])
+		filePath := strings.TrimSpace(line[2:])
+		if filePath == "" {
+			continue
 		}
 
-		files = append(files, gitChangedFile{
-			StatusCode: statusCode,
-			FilePath:   filePath,
-		})
+		status := compactGitStatus(line[0], line[1])
+		files = append(files, status+": "+filePath)
 	}
 	return files
 }
 
-func parseGitLog(output string) []gitCommit {
+func compactGitStatus(staged, worktree byte) string {
+	switch {
+	case staged == '?' && worktree == '?':
+		return "?"
+	case staged == '!' && worktree == '!':
+		return "!"
+	case staged == 'M' && worktree == 'M':
+		return "*"
+	case staged == 'M' && worktree == ' ':
+		return "M"
+	case staged == ' ' && worktree == 'M':
+		return "m"
+	case staged == 'A' && (worktree == ' ' || worktree == 'M'):
+		return "+"
+	case staged == 'D' && worktree == ' ':
+		return "D"
+	case staged == ' ' && worktree == 'D':
+		return "d"
+	case staged == 'D' && worktree == 'D':
+		return "D"
+	case staged == 'R' || worktree == 'R':
+		return "r"
+	case staged == 'C' || worktree == 'C':
+		return "c"
+	case staged == 'U' || worktree == 'U':
+		return "u"
+	default:
+		code := strings.TrimSpace(string([]byte{staged, worktree}))
+		if code == "" {
+			return "."
+		}
+		return code
+	}
+}
+
+func parseDiffStatSummary(output string) []string {
 	if output == "" {
-		return []gitCommit{}
+		return []string{}
 	}
 
 	lines := strings.Split(output, "\n")
-	commits := make([]gitCommit, 0, len(lines))
+	summary := make([]string, 0, len(lines))
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		summary = append(summary, line)
+	}
+	return summary
+}
+
+func parseGitLog(output string) []string {
+	if output == "" {
+		return []string{}
+	}
+
+	lines := strings.Split(output, "\n")
+	commits := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
-		hash, subject, _ := strings.Cut(line, " ")
-		commits = append(commits, gitCommit{
-			ShortCommitHash: hash,
-			CommitSubject:   subject,
-		})
+		hash, subject, ok := strings.Cut(line, " ")
+		if !ok || hash == "" || subject == "" {
+			continue
+		}
+		commits = append(commits, hash+": "+subject)
 	}
 	return commits
 }

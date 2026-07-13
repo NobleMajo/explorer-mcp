@@ -2,6 +2,7 @@ package globals
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
@@ -26,24 +27,15 @@ require github.com/single/dep v9.9.9
 		t.Fatalf("len(deps) = %d, want 3", len(deps))
 	}
 
-	byName := make(map[string]GoDependency, len(deps))
-	for _, dep := range deps {
-		byName[dep.PackageName] = dep
+	want := []string{
+		"github.com/foo/bar@v1.2.3 direct",
+		"github.com/indirect/dep@v0.1.0 indirect",
+		"github.com/single/dep@v9.9.9 direct",
 	}
-
-	foo, ok := byName["github.com/foo/bar"]
-	if !ok || foo.Version != "v1.2.3" || foo.IsIndirect {
-		t.Fatalf("unexpected foo dep: %+v", foo)
-	}
-
-	indirect, ok := byName["github.com/indirect/dep"]
-	if !ok || !indirect.IsIndirect {
-		t.Fatalf("expected indirect dep: %+v", indirect)
-	}
-
-	single, ok := byName["github.com/single/dep"]
-	if !ok || single.Version != "v9.9.9" {
-		t.Fatalf("unexpected single dep: %+v", single)
+	for _, entry := range want {
+		if !slices.Contains(deps, entry) {
+			t.Fatalf("missing %q in %v", entry, deps)
+		}
 	}
 }
 
@@ -118,8 +110,8 @@ func TestLoadGoModManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadGoModManifest() error: %v", err)
 	}
-	if got.EcosystemName != "go" || !got.IsParsed || got.DependencyCount != 1 {
-		t.Fatalf("unexpected result: %+v", got)
+	if len(got) != 1 || got[0] != "github.com/foo/bar@v1.0.0 direct" {
+		t.Fatalf("unexpected result: %v", got)
 	}
 }
 
@@ -134,8 +126,14 @@ func TestLoadPackageJsonManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPackageJsonManifest() error: %v", err)
 	}
-	if got.EcosystemName != "node" || !got.IsParsed || len(got.DependencyGroups) != 2 {
-		t.Fatalf("unexpected result: %+v", got)
+	want := []string{"alpha@1.0.0 production", "eslint@9.0.0 development"}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected result: %v", got)
+	}
+	for _, entry := range want {
+		if !slices.Contains(got, entry) {
+			t.Fatalf("missing %q in %v", entry, got)
+		}
 	}
 }
 
@@ -150,12 +148,14 @@ func TestLoadRequirementsManifest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRequirementsManifest() error: %v", err)
 	}
-	if !got.IsParsed || len(got.DependencyGroups) != 1 {
-		t.Fatalf("unexpected groups: %+v", got.DependencyGroups)
+	want := []string{"flask@>=3.0.0", "requests@==2.28.0"}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected result: %v", got)
 	}
-	names := got.DependencyGroups[0].PackageNames
-	if len(names) != 2 || names[0] != "flask" || names[1] != "requests" {
-		t.Fatalf("unexpected package names: %#v", names)
+	for _, entry := range want {
+		if !slices.Contains(got, entry) {
+			t.Fatalf("missing %q in %v", entry, got)
+		}
 	}
 }
 
@@ -179,9 +179,8 @@ func TestLoadRequirementsManifestInlineComment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRequirementsManifest() error: %v", err)
 	}
-	names := got.DependencyGroups[0].PackageNames
-	if len(names) != 1 || names[0] != "requests" {
-		t.Fatalf("unexpected package names: %#v", names)
+	if len(got) != 1 || got[0] != "requests@==2.28.0" {
+		t.Fatalf("unexpected result: %v", got)
 	}
 }
 
@@ -196,9 +195,8 @@ func TestLoadRequirementsManifestPlainPackageName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRequirementsManifest() error: %v", err)
 	}
-	names := got.DependencyGroups[0].PackageNames
-	if len(names) != 1 || names[0] != "requests" {
-		t.Fatalf("unexpected package names: %#v", names)
+	if len(got) != 1 || got[0] != "requests" {
+		t.Fatalf("unexpected result: %v", got)
 	}
 }
 
@@ -213,8 +211,8 @@ func TestLoadRequirementsManifestEmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadRequirementsManifest() error: %v", err)
 	}
-	if !got.IsParsed || len(got.DependencyGroups) != 1 || len(got.DependencyGroups[0].PackageNames) != 0 {
-		t.Fatalf("unexpected empty requirements result: %+v", got)
+	if len(got) != 0 {
+		t.Fatalf("unexpected empty requirements result: %v", got)
 	}
 }
 
@@ -229,8 +227,8 @@ func TestLoadCargoManifestDetectOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadCargoManifest() error: %v", err)
 	}
-	if got.IsParsed || got.EcosystemName != "rust" || got.ParseSkipReason == "" {
-		t.Fatalf("unexpected detect-only result: %+v", got)
+	if len(got) != 0 {
+		t.Fatalf("expected no parsed cargo dependencies, got %v", got)
 	}
 }
 
@@ -245,32 +243,7 @@ func TestLoadPyprojectManifestDetectOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPyprojectManifest() error: %v", err)
 	}
-	if got.IsParsed || got.EcosystemName != "python" {
-		t.Fatalf("unexpected detect-only result: %+v", got)
-	}
-}
-
-func TestEcosystemNameForManifest(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		path string
-		want string
-	}{
-		{path: "go.mod", want: "go"},
-		{path: "package.json", want: "node"},
-		{path: "requirements.txt", want: "python"},
-		{path: "Cargo.toml", want: "rust"},
-		{path: "pyproject.toml", want: "python"},
-		{path: "unknown.lock", want: "unknown"},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.path, func(t *testing.T) {
-			t.Parallel()
-			if got := ecosystemNameForManifest(tc.path); got != tc.want {
-				t.Fatalf("ecosystemNameForManifest(%q) = %q, want %q", tc.path, got, tc.want)
-			}
-		})
+	if len(got) != 0 {
+		t.Fatalf("expected no parsed pyproject dependencies, got %v", got)
 	}
 }

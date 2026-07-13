@@ -155,9 +155,6 @@ func TestProjectToolsDetectsPackageJsonScripts(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "project_tools" {
-		t.Fatalf("toolName = %q", resp.ToolName)
-	}
 	if !resp.HasPackageJson || resp.PackageJsonScriptCount != 2 {
 		t.Fatalf("unexpected package.json scripts: %+v", resp)
 	}
@@ -180,9 +177,6 @@ func TestProjectToolsDetectsMakefileTargets(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "project_tools" {
-		t.Fatalf("toolName = %q", resp.ToolName)
-	}
 	if !resp.HasMakefile || resp.MakefileTargetCount != 2 {
 		t.Fatalf("unexpected makefile targets: %+v", resp)
 	}

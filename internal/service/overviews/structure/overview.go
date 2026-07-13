@@ -6,22 +6,12 @@ import (
 	"sort"
 
 	"github.com/NobleMajo/explorer-mcp/internal/gitignore"
-	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
 
 type repoStructureResponse struct {
-	jsonresp.Meta
-	RootPath    string           `json:"rootPath"`
-	EntryCount  int              `json:"entryCount"`
-	Entries     []structureEntry `json:"entries"`
-}
-
-type structureEntry struct {
-	RelativePath string `json:"relativePath"`
-	EntryName    string `json:"entryName"`
-	IsDirectory  bool   `json:"isDirectory"`
-	Depth        int    `json:"depth"`
+	EntryCount int      `json:"entryCount"`
+	Entries    []string `json:"entries"`
 }
 
 type scanState struct {
@@ -56,24 +46,19 @@ func buildRepoStructure(verbose bool) (repoStructureResponse, error) {
 		return repoStructureResponse{}, err
 	}
 
-	entries := make([]structureEntry, 0)
+	entries := make([]string, 0)
 	state := newScanState()
 	if err := appendStructureEntries(root, root, 0, &entries, state); err != nil {
 		return repoStructureResponse{}, err
 	}
 
 	return repoStructureResponse{
-		Meta: jsonresp.Meta{
-			ToolName:      "repo_structure",
-			SchemaVersion: jsonresp.SchemaVersion,
-		},
-		RootPath:   root,
 		EntryCount: len(entries),
 		Entries:    entries,
 	}, nil
 }
 
-func appendStructureEntries(root, dir string, depth int, entries *[]structureEntry, state *scanState) error {
+func appendStructureEntries(root, dir string, depth int, entries *[]string, state *scanState) error {
 	if depth >= globals.StructureScanMaxDepth {
 		return nil
 	}
@@ -116,12 +101,7 @@ func appendStructureEntries(root, dir string, depth int, entries *[]structureEnt
 			continue
 		}
 
-		*entries = append(*entries, structureEntry{
-			RelativePath: filepath.ToSlash(relPath),
-			EntryName:    entry.Name(),
-			IsDirectory:  false,
-			Depth:        depth + 1,
-		})
+		*entries = append(*entries, filepath.ToSlash(relPath))
 	}
 
 	return nil

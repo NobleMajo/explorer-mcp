@@ -4,21 +4,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
-
-func TestContainsEcosystemName(t *testing.T) {
-	t.Parallel()
-
-	names := []string{"go", "node"}
-	if !containsEcosystemName(names, "go") {
-		t.Fatal("expected go to be found")
-	}
-	if containsEcosystemName(names, "python") {
-		t.Fatal("expected python to be missing")
-	}
-}
 
 func TestDependenciesFindsManifests(t *testing.T) {
 	root := t.TempDir()
@@ -32,16 +19,16 @@ func TestDependenciesFindsManifests(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "dependencies" || resp.EcosystemCount != 2 {
-		t.Fatalf("unexpected response: ecosystemCount=%d ecosystems=%+v", resp.EcosystemCount, resp.Ecosystems)
+	if !slices.Contains(resp, "github.com/foo/bar@v1.0.0 direct") {
+		t.Fatalf("missing go dependency, got %v", resp)
 	}
-	if !slices.Contains(resp.DetectedEcosystemNames, "go") || !slices.Contains(resp.DetectedEcosystemNames, "node") {
-		t.Fatalf("detected ecosystems = %v", resp.DetectedEcosystemNames)
+	if !slices.Contains(resp, "left-pad@1.0.0 production") {
+		t.Fatalf("missing node dependency, got %v", resp)
 	}
 }
 
@@ -57,18 +44,12 @@ func TestDependenciesDetectOnlyManifests(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-
-	if resp.EcosystemCount != 2 {
-		t.Fatalf("ecosystemCount = %d, want 2", resp.EcosystemCount)
-	}
-	for _, eco := range resp.Ecosystems {
-		if eco.IsParsed {
-			t.Fatalf("expected detect-only for %s, got %+v", eco.EcosystemName, eco)
-		}
+	if len(resp) != 0 {
+		t.Fatalf("expected no parsed dependencies, got %v", resp)
 	}
 }
 
@@ -82,12 +63,12 @@ func TestDependenciesRequirementsTxt(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.EcosystemCount != 1 || resp.Ecosystems[0].EcosystemName != "python" {
-		t.Fatalf("unexpected python deps: %+v", resp)
+	if len(resp) != 1 || resp[0] != "flask@>=3.0.0" {
+		t.Fatalf("unexpected python deps: %v", resp)
 	}
 }
 
@@ -105,32 +86,18 @@ func TestDependenciesAllManifestLoaders(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.EcosystemCount != len(globals.ManifestLoaders) {
-		t.Fatalf("ecosystemCount = %d, want %d", resp.EcosystemCount, len(globals.ManifestLoaders))
-	}
-
-	manifestPaths := make([]string, 0, len(resp.Ecosystems))
-	for _, eco := range resp.Ecosystems {
-		manifestPaths = append(manifestPaths, eco.ManifestFilePath)
-	}
-	for fileName := range globals.ManifestLoaders {
-		if !slices.Contains(manifestPaths, fileName) {
-			t.Fatalf("missing manifest %q in ecosystems: %+v", fileName, resp.Ecosystems)
-		}
-	}
-
-	wantNames := []string{"go", "node", "python", "rust"}
-	if len(resp.DetectedEcosystemNames) != len(wantNames) {
-		t.Fatalf("detected ecosystems = %v, want %v", resp.DetectedEcosystemNames, wantNames)
-	}
-	for _, name := range wantNames {
-		if !slices.Contains(resp.DetectedEcosystemNames, name) {
-			t.Fatalf("missing ecosystem name %q in %v", name, resp.DetectedEcosystemNames)
+	for _, want := range []string{
+		"github.com/foo/bar@v1.0.0 direct",
+		"left-pad@1.0.0 production",
+		"flask@>=3.0.0",
+	} {
+		if !slices.Contains(resp, want) {
+			t.Fatalf("missing dependency %q, got %v", want, resp)
 		}
 	}
 }
@@ -144,12 +111,12 @@ func TestDependenciesSkipsMissingManifests(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.EcosystemCount != 0 || len(resp.Ecosystems) != 0 {
-		t.Fatalf("expected no ecosystems, got %+v", resp)
+	if len(resp) != 0 {
+		t.Fatalf("expected no dependencies, got %v", resp)
 	}
 }
 
@@ -163,12 +130,12 @@ func TestDependenciesGoModLoaderError(t *testing.T) {
 		t.Fatalf("DepsOverview() error: %v", err)
 	}
 
-	resp, ok := result.(dependenciesResponse)
+	resp, ok := result.([]string)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.EcosystemCount != 1 || resp.Ecosystems[0].EcosystemName != "go" {
-		t.Fatalf("expected parsed go ecosystem, got %+v", resp)
+	if len(resp) != 0 {
+		t.Fatalf("expected empty go.mod to yield no dependencies, got %v", resp)
 	}
 }
 
