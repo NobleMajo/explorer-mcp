@@ -135,6 +135,9 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 
 	gotMaxDepth := 0
 	for _, path := range entries {
+		if strings.HasSuffix(path, "/**") {
+			continue
+		}
 		depth := strings.Count(path, "/") + 1
 		if depth > gotMaxDepth {
 			gotMaxDepth = depth
@@ -142,6 +145,75 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 	}
 	if gotMaxDepth > maxDepth {
 		t.Fatalf("max entry depth = %d, want <= %d", gotMaxDepth, maxDepth)
+	}
+	if !slices.Contains(entries, "level/level/level/**") {
+		t.Fatalf("expected depth truncation marker level/level/level/**, got %v", entries)
+	}
+}
+
+func TestAppendStructureEntriesMarksDeeperDirectories(t *testing.T) {
+	const maxDepth = 3
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/internal/service/overviews/structure", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/internal/service/handlers.go", "package service\n")
+	testutil.WriteFile(t, root+"/internal/service/overviews/structure/overview.go", "package structure\n")
+	testutil.WriteFile(t, root+"/internal/config/config.go", "package config\n")
+
+	entries := make([]string, 0)
+	if err := appendStructureEntries(root, root, 0, maxDepth, &entries); err != nil {
+		t.Fatalf("appendStructureEntries() error: %v", err)
+	}
+
+	for _, want := range []string{
+		"internal/config/config.go",
+		"internal/service/handlers.go",
+		"internal/service/overviews/**",
+	} {
+		if !slices.Contains(entries, want) {
+			t.Fatalf("expected %q in entries, got %v", want, entries)
+		}
+	}
+	for _, path := range entries {
+		if strings.HasSuffix(path, "/**") && strings.Count(strings.TrimSuffix(path, "/**"), "/")+1 > maxDepth {
+			t.Fatalf("truncation marker beyond depth limit: %q", path)
+		}
+	}
+}
+
+func TestAppendStructureEntriesOmitsMarkerForEmptyDirectory(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/empty/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := make([]string, 0)
+	if err := appendStructureEntries(root, root, 0, 2, &entries); err != nil {
+		t.Fatalf("appendStructureEntries() error: %v", err)
+	}
+
+	for _, path := range entries {
+		if strings.HasSuffix(path, "/**") {
+			t.Fatalf("expected no truncation marker for empty dirs, got %q", path)
+		}
+	}
+}
+
+func TestRepoStructureIncludesScanDepthLimit(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	const depth = 4
+	result, err := StructureOverview(depth)()(false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	if resp.RepoScanDepthLimit == nil || *resp.RepoScanDepthLimit != depth {
+		t.Fatalf("repoScanDepthLimit = %v, want %d", resp.RepoScanDepthLimit, depth)
 	}
 }
 

@@ -9,9 +9,10 @@ import (
 )
 
 type repoStructureResponse struct {
-	RepoScanPerformed bool     `json:"repoScanPerformed"`
-	EntryCount        *int     `json:"entryCount,omitempty"`
-	Entries           []string `json:"entries,omitempty"`
+	RepoScanPerformed  bool     `json:"repoScanPerformed"`
+	RepoScanDepthLimit *int     `json:"repoScanDepthLimit,omitempty"`
+	EntryCount         *int     `json:"entryCount,omitempty"`
+	Entries            []string `json:"entries,omitempty"`
 }
 
 func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse, error) {
@@ -34,6 +35,7 @@ func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse,
 	}
 
 	count := len(entries)
+	resp.RepoScanDepthLimit = &repoScanDepth
 	resp.EntryCount = &count
 	if len(entries) > 0 {
 		resp.Entries = entries
@@ -68,6 +70,16 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 		}
 
 		if entry.IsDir() {
+			if depth+1 >= maxDepth {
+				hasMore, err := hasVisibleDescendants(fullPath)
+				if err != nil {
+					return err
+				}
+				if hasMore {
+					*entries = append(*entries, filepath.ToSlash(relPath)+"/**")
+				}
+				continue
+			}
 			if err := appendStructureEntries(root, fullPath, depth+1, maxDepth, entries); err != nil {
 				return err
 			}
@@ -82,4 +94,35 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 	}
 
 	return nil
+}
+
+func hasVisibleDescendants(dir string) (bool, error) {
+	dirEntries, err := os.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
+
+	for _, entry := range dirEntries {
+		if globals.IsScanIgnored(entry.Name()) {
+			continue
+		}
+
+		if !entry.IsDir() {
+			if globals.IsIgnoredFile(entry.Name()) {
+				continue
+			}
+			return true, nil
+		}
+
+		childPath := filepath.Join(dir, entry.Name())
+		hasMore, err := hasVisibleDescendants(childPath)
+		if err != nil {
+			return false, err
+		}
+		if hasMore {
+			return true, nil
+		}
+	}
+
+	return false, nil
 }
