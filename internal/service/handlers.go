@@ -237,15 +237,22 @@ func hasProjectToolsData(projectTools json.RawMessage) bool {
 	}
 
 	var tools struct {
-		MakefileTargetCount    int `json:"makefileTargetCount"`
-		PackageJsonScriptCount int `json:"packageJsonScriptCount"`
-		ShellScriptCount       int `json:"shellScriptCount"`
+		ToolsFound   []string            `json:"toolsFound"`
+		ScriptsFound map[string][]string `json:"scriptsFound"`
 	}
 	if json.Unmarshal(projectTools, &tools) != nil {
 		return false
 	}
 
-	return tools.MakefileTargetCount > 0 || tools.PackageJsonScriptCount > 0 || tools.ShellScriptCount > 0
+	if len(tools.ToolsFound) > 0 {
+		return true
+	}
+	for _, scripts := range tools.ScriptsFound {
+		if len(scripts) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func overviewSection(fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {

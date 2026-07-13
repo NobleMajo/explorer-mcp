@@ -53,7 +53,7 @@ func TestManifestLoadersInvokeAll(t *testing.T) {
 	}
 
 	expected := map[string][]string{
-		"go.mod":           {"github.com/foo/bar@v1.0.0 direct"},
+		"go.mod":           {"github.com/foo/bar@v1.0.0 @direct"},
 		"package.json":     {"left-pad@1.0.0 production"},
 		"requirements.txt": {"flask@>=3.0.0"},
 		"Cargo.toml":       nil,

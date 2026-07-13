@@ -7,11 +7,9 @@ import (
 )
 
 type workspaceContextResponse struct {
-	CurrentWorkingDirectoryPath string   `json:"currentWorkingDirectoryPath"`
-	ParentDirectoryPath         string   `json:"parentDirectoryPath"`
-	ParentScanPerformed         bool     `json:"parentScanPerformed"`
-	SiblingProjectCount         *int     `json:"siblingProjectCount,omitempty"`
-	SiblingProjects             []string `json:"siblingProjects,omitempty"`
+	ParentScanPerformed bool     `json:"parentScanPerformed"`
+	SiblingProjectCount *int     `json:"siblingProjectCount,omitempty"`
+	SiblingProjects     []string `json:"siblingProjects,omitempty"`
 }
 
 func buildWorkspaceContext(verbose bool, parentScanDepth int) (workspaceContextResponse, error) {
@@ -22,9 +20,7 @@ func buildWorkspaceContext(verbose bool, parentScanDepth int) (workspaceContextR
 	}
 
 	resp := workspaceContextResponse{
-		CurrentWorkingDirectoryPath: cwd,
-		ParentDirectoryPath:         filepath.Dir(cwd),
-		ParentScanPerformed:         parentScanDepth > 0,
+		ParentScanPerformed: parentScanDepth > 0,
 	}
 	if parentScanDepth < 1 {
 		return resp, nil

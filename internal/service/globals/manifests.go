@@ -109,9 +109,9 @@ func LoadPyprojectManifest(root, manifestPath string) (string, []string, bool, e
 }
 
 func formatGoModuleDependency(name, version string, indirect bool) string {
-	scope := "direct"
+	scope := "@direct"
 	if indirect {
-		scope = "indirect"
+		scope = "@indirect"
 	}
 	return name + "@" + version + " " + scope
 }

@@ -164,12 +164,15 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "rootPath")
 	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "projectRootPath")
 	assertSectionHasField(t, "gitOverview", resp.GitOverview, "isGitAvailable")
-	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "currentWorkingDirectoryPath")
+	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "parentScanPerformed")
+	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "currentWorkingDirectoryPath")
+	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "parentDirectoryPath")
 	assertSectionIsJSONArray(t, "dependencies", resp.Dependencies)
 	assertSectionHasField(t, "containerOverview", resp.ContainerOverview, "detectedContainerFileCount")
 	assertSectionMissingField(t, "containerOverview", resp.ContainerOverview, "projectRootPath")
-	assertSectionHasField(t, "projectTools", resp.ProjectTools, "makefileTargetCount")
+	assertSectionHasField(t, "projectTools", resp.ProjectTools, "toolsFound")
 	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "projectRootPath")
+	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "hasMakefile")
 
 	if resp.AgentBehaviorMainInstruction != AgentBehaviorMainInstruction {
 		t.Fatalf("agentBehaviorMainInstruction = %q", resp.AgentBehaviorMainInstruction)
@@ -303,7 +306,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "deps with ecosystems",
 			domain: "deps",
 			sect: exploreSections{
-				dependencies: mustRawJSON(t, []string{"demo@1.0.0 direct"}),
+				dependencies: mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
 			},
 			want: true,
 		},
@@ -351,7 +354,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools makefile",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"makefileTargetCount": 1}),
+				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -359,7 +362,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools scripts",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"packageJsonScriptCount": 3}),
+				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"package.json"}, "scriptsFound": map[string]any{"package": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -407,7 +410,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools shell scripts",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"shellScriptCount": 2}),
+				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"*.sh"}, "scriptsFound": map[string]any{"shell": []string{"run.sh"}}}),
 			},
 			want: true,
 		},
@@ -467,10 +470,10 @@ func TestHasProjectToolsData(t *testing.T) {
 	}{
 		{name: "empty", raw: nil, want: false},
 		{name: "invalid json", raw: json.RawMessage("{"), want: false},
-		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"makefileTargetCount": 0, "packageJsonScriptCount": 0, "shellScriptCount": 0}), want: false},
-		{name: "makefile", raw: mustRawJSON(t, map[string]any{"makefileTargetCount": 1}), want: true},
-		{name: "package json", raw: mustRawJSON(t, map[string]any{"packageJsonScriptCount": 1}), want: true},
-		{name: "shell", raw: mustRawJSON(t, map[string]any{"shellScriptCount": 1}), want: true},
+		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"toolsFound": []string{}, "scriptsFound": map[string]any{}}), want: false},
+		{name: "makefile", raw: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}}), want: true},
+		{name: "package json", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"package": []string{"build"}}}), want: true},
+		{name: "shell", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"shell": []string{"run.sh"}}}), want: true},
 	}
 
 	for _, tc := range tests {
@@ -491,9 +494,9 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 		repoStructure:     mustRawJSON(t, map[string]any{"repoScanPerformed": true, "entryCount": 1}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
 		workspaceContext:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
-		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 direct"}),
+		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
 		containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
-		projectTools:      mustRawJSON(t, map[string]any{"makefileTargetCount": 1}),
+		projectTools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
 	}
 
 	instructions := buildAgentBehaviorInstructions(sections)

@@ -155,8 +155,11 @@ func TestProjectToolsDetectsPackageJsonScripts(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if !resp.HasPackageJson || resp.PackageJsonScriptCount != 2 {
-		t.Fatalf("unexpected package.json scripts: %+v", resp)
+	if !reflect.DeepEqual(resp.ToolsFound, []string{"package.json"}) {
+		t.Fatalf("unexpected toolsFound: %+v", resp.ToolsFound)
+	}
+	if !reflect.DeepEqual(resp.ScriptsFound, map[string][]string{"package": {"build", "test"}}) {
+		t.Fatalf("unexpected scriptsFound: %+v", resp.ScriptsFound)
 	}
 }
 
@@ -177,10 +180,13 @@ func TestProjectToolsDetectsMakefileTargets(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if !resp.HasMakefile || resp.MakefileTargetCount != 2 {
-		t.Fatalf("unexpected makefile targets: %+v", resp)
+	if !reflect.DeepEqual(resp.ToolsFound, []string{"*.sh", "Makefile"}) {
+		t.Fatalf("unexpected toolsFound: %+v", resp.ToolsFound)
 	}
-	if resp.ShellScriptCount != 1 {
-		t.Fatalf("shellScriptCount = %d, want 1", resp.ShellScriptCount)
+	if !reflect.DeepEqual(resp.ScriptsFound, map[string][]string{
+		"make":  {"build", "test"},
+		"shell": {"run.sh"},
+	}) {
+		t.Fatalf("unexpected scriptsFound: %+v", resp.ScriptsFound)
 	}
 }

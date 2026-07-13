@@ -24,7 +24,7 @@ func TestDependenciesFindsManifests(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if !slices.Contains(resp, "github.com/foo/bar@v1.0.0 direct") {
+	if !slices.Contains(resp, "github.com/foo/bar@v1.0.0 @direct") {
 		t.Fatalf("missing go dependency, got %v", resp)
 	}
 	if !slices.Contains(resp, "left-pad@1.0.0 production") {
@@ -92,7 +92,7 @@ func TestDependenciesAllManifestLoaders(t *testing.T) {
 	}
 
 	for _, want := range []string{
-		"github.com/foo/bar@v1.0.0 direct",
+		"github.com/foo/bar@v1.0.0 @direct",
 		"left-pad@1.0.0 production",
 		"flask@>=3.0.0",
 	} {

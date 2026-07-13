@@ -28,9 +28,9 @@ require github.com/single/dep v9.9.9
 	}
 
 	want := []string{
-		"github.com/foo/bar@v1.2.3 direct",
-		"github.com/indirect/dep@v0.1.0 indirect",
-		"github.com/single/dep@v9.9.9 direct",
+		"github.com/foo/bar@v1.2.3 @direct",
+		"github.com/indirect/dep@v0.1.0 @indirect",
+		"github.com/single/dep@v9.9.9 @direct",
 	}
 	for _, entry := range want {
 		if !slices.Contains(deps, entry) {
@@ -125,7 +125,7 @@ func TestLoadGoModManifest(t *testing.T) {
 	if tag != "@go" {
 		t.Fatalf("tag = %q, want @go", tag)
 	}
-	if len(got) != 1 || got[0] != "github.com/foo/bar@v1.0.0 direct" {
+	if len(got) != 1 || got[0] != "github.com/foo/bar@v1.0.0 @direct" {
 		t.Fatalf("unexpected result: %v", got)
 	}
 }

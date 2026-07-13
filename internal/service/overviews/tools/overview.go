@@ -14,14 +14,8 @@ import (
 var makefileTargetNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
 type projectToolsResponse struct {
-	HasMakefile            bool     `json:"hasMakefile"`
-	MakefileTargetCount    int      `json:"makefileTargetCount"`
-	MakefileTargetNames    []string `json:"makefileTargetNames"`
-	HasPackageJson         bool     `json:"hasPackageJson"`
-	PackageJsonScriptCount int      `json:"packageJsonScriptCount"`
-	PackageJsonScriptNames []string `json:"packageJsonScriptNames"`
-	ShellScriptCount       int      `json:"shellScriptCount"`
-	ShellScriptPaths       []string `json:"shellScriptPaths"`
+	ToolsFound   []string            `json:"toolsFound,omitempty"`
+	ScriptsFound map[string][]string `json:"scriptsFound,omitempty"`
 }
 
 func buildProjectTools(verbose bool) (projectToolsResponse, error) {
@@ -31,42 +25,48 @@ func buildProjectTools(verbose bool) (projectToolsResponse, error) {
 		return projectToolsResponse{}, err
 	}
 
-	resp := projectToolsResponse{
-		MakefileTargetNames:    []string{},
-		PackageJsonScriptNames: []string{},
-		ShellScriptPaths:       []string{},
-	}
+	toolsFound := make([]string, 0, 3)
+	scriptsFound := make(map[string][]string)
 
 	makefilePath := filepath.Join(root, "Makefile")
 	if fsutil.FileExists(makefilePath) {
-		resp.HasMakefile = true
+		toolsFound = append(toolsFound, "Makefile")
 		data, err := os.ReadFile(makefilePath)
 		if err != nil {
 			return projectToolsResponse{}, err
 		}
-		resp.MakefileTargetNames = parseMakefileTargetNames(string(data))
-		resp.MakefileTargetCount = len(resp.MakefileTargetNames)
+		if names := parseMakefileTargetNames(string(data)); len(names) > 0 {
+			scriptsFound["make"] = names
+		}
 	}
 
 	packageJSONPath := filepath.Join(root, "package.json")
 	if fsutil.FileExists(packageJSONPath) {
-		resp.HasPackageJson = true
+		toolsFound = append(toolsFound, "package.json")
 		names, err := parsePackageJsonScriptNames(packageJSONPath)
 		if err != nil {
 			return projectToolsResponse{}, err
 		}
-		resp.PackageJsonScriptNames = names
-		resp.PackageJsonScriptCount = len(names)
+		if len(names) > 0 {
+			scriptsFound["package"] = names
+		}
 	}
 
 	shellScripts, err := listRootShellScripts(root)
 	if err != nil {
 		return projectToolsResponse{}, err
 	}
-	resp.ShellScriptPaths = shellScripts
-	resp.ShellScriptCount = len(shellScripts)
+	if len(shellScripts) > 0 {
+		toolsFound = append(toolsFound, "*.sh")
+		scriptsFound["shell"] = shellScripts
+	}
 
-	return resp, nil
+	sort.Strings(toolsFound)
+
+	return projectToolsResponse{
+		ToolsFound:   toolsFound,
+		ScriptsFound: scriptsFound,
+	}, nil
 }
 
 func parseMakefileTargetNames(content string) []string {

@@ -47,9 +47,6 @@ func TestWorkspaceContext(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.CurrentWorkingDirectoryPath != current || resp.ParentDirectoryPath != parent {
-		t.Fatalf("unexpected paths: cwd=%q parent=%q", resp.CurrentWorkingDirectoryPath, resp.ParentDirectoryPath)
-	}
 	if resp.ParentScanPerformed != true {
 		t.Fatalf("parentScanPerformed = %v, want true", resp.ParentScanPerformed)
 	}

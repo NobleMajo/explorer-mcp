@@ -16,6 +16,8 @@ type AppConfig struct {
 
 	RecentCommitCount         int
 	ParentScanDepth           int
+	ParentIgnoreDotDirs       bool
+	ParentIgnoreHomeDir       bool
 	RepoScanDepth             int
 	RemoveBehaviorInstruction bool
 }
@@ -30,6 +32,8 @@ func defaultAppConfig() *AppConfig {
 
 		RecentCommitCount:         12,
 		ParentScanDepth:           2,
+		ParentIgnoreDotDirs:       false,
+		ParentIgnoreHomeDir:       false,
 		RepoScanDepth:             6,
 		RemoveBehaviorInstruction: false,
 	}
@@ -83,6 +87,8 @@ func loadEnvVars(appConfig *AppConfig) {
 func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().IntVarP(&appConfig.RecentCommitCount, "recent-commit-count", "c", appConfig.RecentCommitCount, "number of recent git commits to include (RECENT_COMMIT_COUNT)")
 	cmd.PersistentFlags().IntVarP(&appConfig.ParentScanDepth, "parent-scan-depth", "p", appConfig.ParentScanDepth, "parent directory scan depth (PARENT_SCAN_DEPTH)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanDotDirs, "no-behavior", "n", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
+	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanHomeDir, "skip-home", "n", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
 	cmd.PersistentFlags().IntVarP(&appConfig.RepoScanDepth, "repo-scan-depth", "d", appConfig.RepoScanDepth, "repo structure scan depth (REPO_SCAN_DEPTH)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.RemoveBehaviorInstruction, "no-behavior", "n", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
 }
