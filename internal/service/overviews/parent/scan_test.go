@@ -150,6 +150,62 @@ func TestListParentProjectsSkipsNestedDirsForMakefileProject(t *testing.T) {
 	}
 }
 
+func TestListParentProjectsSkipsNestedDirsForDockerComposeProject(t *testing.T) {
+	root := t.TempDir()
+	parent := filepath.Join(root, "parent")
+	current := filepath.Join(parent, "app")
+	composeSibling := filepath.Join(parent, "stack")
+	if err := os.MkdirAll(current, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, filepath.Join(composeSibling, "docker-compose.yml"), "services: {}\n")
+	if err := os.MkdirAll(filepath.Join(composeSibling, "services"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	siblings, err := listParentProjects(current, scanSettings(3))
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	want := "../stack @docker-compose"
+	if !slices.Contains(siblings, want) {
+		t.Fatalf("missing %q in siblings %v", want, siblings)
+	}
+	for _, entry := range siblings {
+		if strings.HasPrefix(siblingRelativePath(entry), "../stack/") {
+			t.Fatalf("expected no nested paths under compose project, got %q", entry)
+		}
+	}
+}
+
+func TestListParentProjectsSkipsNestedDirsForGNUmakefileProject(t *testing.T) {
+	root := t.TempDir()
+	parent := filepath.Join(root, "parent")
+	current := filepath.Join(parent, "app")
+	makeSibling := filepath.Join(parent, "legacy")
+	if err := os.MkdirAll(current, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, filepath.Join(makeSibling, "GNUmakefile"), "build:\n")
+	if err := os.MkdirAll(filepath.Join(makeSibling, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	siblings, err := listParentProjects(current, scanSettings(3))
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	want := "../legacy @makefile"
+	if !slices.Contains(siblings, want) {
+		t.Fatalf("missing %q in siblings %v", want, siblings)
+	}
+	for _, entry := range siblings {
+		if strings.HasPrefix(siblingRelativePath(entry), "../legacy/") {
+			t.Fatalf("expected no nested paths under makefile project, got %q", entry)
+		}
+	}
+}
+
 func TestListParentProjectsSkipsCurrentProjectSubtree(t *testing.T) {
 	root := t.TempDir()
 	current := filepath.Join(root, "app")

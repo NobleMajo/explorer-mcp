@@ -85,6 +85,29 @@ func TestFormatSiblingProjectIdentifierTags(t *testing.T) {
 	}
 }
 
+func TestFormatSiblingProjectDockerViteTags(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	uiDir := filepath.Join(root, "ui")
+	if err := os.MkdirAll(uiDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, filepath.Join(uiDir, "package.json"), "{}\n")
+
+	got := formatSiblingProject(uiDir, "../ui", []string{
+		"Dockerfile",
+		"docker-compose.yaml",
+		"vite.config.mts",
+		"biome.jsonc",
+		"package.json",
+	}, nil)
+	want := "../ui @npm @docker @docker-compose @vite @biome"
+	if got != want {
+		t.Fatalf("formatSiblingProject() = %q, want %q", got, want)
+	}
+}
+
 func TestHasSiblingProjectFlags(t *testing.T) {
 	t.Parallel()
 
@@ -103,5 +126,10 @@ func TestHasSiblingProjectFlags(t *testing.T) {
 	testutil.WriteFile(t, filepath.Join(angularDir, "angular.json"), "{}\n")
 	if !hasSiblingProjectFlags(angularDir, []string{"angular.json"}, nil) {
 		t.Fatal("expected angular dir to have flags")
+	}
+	dockerDir := t.TempDir()
+	testutil.WriteFile(t, filepath.Join(dockerDir, "Dockerfile"), "FROM alpine\n")
+	if !hasSiblingProjectFlags(dockerDir, []string{"Dockerfile"}, nil) {
+		t.Fatal("expected docker dir to have flags")
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
-	"strings"
 )
 
 type ManifestDepsSettings struct {
@@ -137,8 +136,29 @@ var ManifestLoaders = map[string]ManifestLoader{
 
 var ProjectIdentifiers = []ProjectIdentifier{
 	identifyMakefileProject,
-	identifyTSConfigProject,
-	identifyAngularProject,
+	identifyByMatcher("@tsconfig", isTSConfigFileName),
+	identifyByFileNames("@angular", "angular.json"),
+	identifyByMatcher("@docker", isDockerfileName),
+	identifyByMatcher("@docker-compose", isDockerComposeFileName),
+	identifyByMatcher("@vite", func(name string) bool { return isNamedConfigFile(name, "vite.config") }),
+	identifyByFileNames("@biome", "biome.json", "biome.jsonc"),
+	identifyByFileNames("@task", "Taskfile.yml", "Taskfile.yaml", "Taskfile.dist.yml", "Taskfile.dist.yaml"),
+	identifyByMatcher("@next", func(name string) bool { return isNamedConfigFile(name, "next.config") }),
+	identifyByMatcher("@nuxt", func(name string) bool { return isNamedConfigFile(name, "nuxt.config") }),
+	identifyByMatcher("@svelte", func(name string) bool { return isNamedConfigFile(name, "svelte.config") }),
+	identifyByFileNames("@turbo", "turbo.json"),
+	identifyByFileNames("@nx", "nx.json"),
+	identifyByFileNames("@pnpm-workspace", "pnpm-workspace.yaml"),
+	identifyByFileNames("@just", "justfile", "Justfile"),
+	identifyByFileNames("@meson", "meson.build"),
+	identifyByMatcher("@gradle", isGradleFileName),
+	identifyByFileNames("@maven", "pom.xml"),
+	identifyByFileNames("@nix", "flake.nix", "shell.nix", "default.nix"),
+	identifyByFileNames("@bazel", "WORKSPACE", "MODULE.bazel", "BUILD.bazel"),
+	identifyByFileNames("@tauri", "tauri.conf.json"),
+	identifyByFileNames("@cloudflare", "wrangler.toml"),
+	identifyByFileNames("@rake", "Rakefile"),
+	identifyByFileNames("@earthly", "Earthfile"),
 }
 
 var ScanIgnoreFiles = []string{
@@ -254,52 +274,4 @@ func IsScanIgnored(name string) bool {
 		}
 	}
 	return false
-}
-
-func identifyMakefileProject(path string, subfiles []string, subdirs []string) ([]string, error) {
-	_ = path
-	_ = subdirs
-	if containsFileName(subfiles, "Makefile") {
-		return []string{"@makefile"}, nil
-	}
-	return nil, nil
-}
-
-func identifyTSConfigProject(path string, subfiles []string, subdirs []string) ([]string, error) {
-	_ = path
-	_ = subdirs
-	for _, name := range subfiles {
-		if isTSConfigFileName(name) {
-			return []string{"@tsconfig"}, nil
-		}
-	}
-	return nil, nil
-}
-
-func identifyAngularProject(path string, subfiles []string, subdirs []string) ([]string, error) {
-	_ = path
-	_ = subdirs
-	if containsFileName(subfiles, "angular.json") {
-		return []string{"@angular"}, nil
-	}
-	return nil, nil
-}
-
-func containsFileName(subfiles []string, name string) bool {
-	for _, fileName := range subfiles {
-		if fileName == name {
-			return true
-		}
-	}
-	return false
-}
-
-func isTSConfigFileName(name string) bool {
-	if name == "tsconfig.json" {
-		return true
-	}
-	if strings.HasSuffix(name, ".tsconfig.json") {
-		return true
-	}
-	return strings.HasPrefix(name, "tsconfig.") && strings.HasSuffix(name, ".json")
 }

@@ -88,3 +88,37 @@ func TestCollectSiblingProjectFlags(t *testing.T) {
 		t.Fatalf("CollectSiblingProjectFlags() = %#v, want %#v", got, want)
 	}
 }
+
+func TestCollectSiblingProjectFlagsWithIdentifiers(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	files := map[string]string{
+		"GNUmakefile":         "build:\n",
+		"Dockerfile":          "FROM alpine\n",
+		"docker-compose.yaml": "services: {}\n",
+		"vite.config.mts":     "export default {}\n",
+		"biome.jsonc":         "{}\n",
+		"package.json":        `{}`,
+	}
+	subfiles := make([]string, 0, len(files))
+	for name, content := range files {
+		testutil.WriteFile(t, root+"/"+name, content)
+		subfiles = append(subfiles, name)
+	}
+
+	got, err := CollectSiblingProjectFlags(root, subfiles, nil)
+	if err != nil {
+		t.Fatalf("CollectSiblingProjectFlags() error: %v", err)
+	}
+
+	want := []string{"@npm", "@makefile", "@docker", "@docker-compose", "@vite", "@biome"}
+	if len(got) != len(want) {
+		t.Fatalf("CollectSiblingProjectFlags() = %#v, want %d tags", got, len(want))
+	}
+	for _, tag := range want {
+		if !slices.Contains(got, tag) {
+			t.Fatalf("CollectSiblingProjectFlags() missing %q in %v", tag, got)
+		}
+	}
+}
