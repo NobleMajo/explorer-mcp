@@ -52,38 +52,51 @@ type opencodeOverviewResponse struct {
 }
 
 func buildOpencodeOverview(verbose bool) (any, error) {
-	_ = verbose
+	logf := func(format string, args ...any) {
+		if !verbose {
+			return
+		}
+		_, _ = fmt.Fprintf(os.Stderr, "opencode overview: "+format+"\n", args...)
+	}
 
 	if _, err := exec.LookPath(cliName); err != nil {
+		logf("begin status=disabled")
 		return nil, nil
 	}
 
 	dir, err := os.Getwd()
 	if err != nil {
+		logf("end status=error")
 		return nil, err
 	}
 
 	cmd := exec.Command(cliName, "debug", "agent", agentName)
 	cmd.Dir = dir
+	logf("begin")
 	out, err := cmd.Output()
 	if err != nil {
+		logf("end status=error")
 		return nil, nil
 	}
 
 	out = bytes.TrimSpace(out)
 	if len(out) == 0 {
+		logf("end status=omitted")
 		return nil, nil
 	}
 
 	var parsed debugAgentResponse
 	if err := json.Unmarshal(out, &parsed); err != nil {
+		logf("end status=error")
 		return nil, nil
 	}
 
-	return opencodeOverviewResponse{
+	resp := opencodeOverviewResponse{
 		Permissions: formatPermissions(parsed.Permission),
 		MCP:         extractMCPServers(parsed.Tools),
-	}, nil
+	}
+	logf("end status=ok")
+	return resp, nil
 }
 
 func formatPermissions(rules []permissionRule) []string {

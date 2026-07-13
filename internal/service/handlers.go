@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
+	"time"
 
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/cli"
@@ -36,8 +38,21 @@ func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
+		start := time.Now()
+		if settings.verbose {
+			_, _ = fmt.Fprintf(os.Stderr, "explore: request begin\n")
+		}
+
 		return jsonToolResult(func() (string, error) {
-			return buildExploreResponse(settings)
+			text, err := buildExploreResponse(settings)
+			if settings.verbose {
+				if err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "explore: request end status=error dur=%s\n", time.Since(start))
+				} else {
+					_, _ = fmt.Fprintf(os.Stderr, "explore: request end status=ok dur=%s\n", time.Since(start))
+				}
+			}
+			return text, err
 		})
 	})
 }
@@ -72,47 +87,76 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		return "", ErrAllOverviewsDisabled
 	}
 
+	logf := func(format string, args ...any) {
+		if !settings.verbose {
+			return
+		}
+		_, _ = fmt.Fprintf(os.Stderr, "explore: "+format+"\n", args...)
+	}
+
 	projectRoot, err := os.Getwd()
 	if err != nil {
+		logf("getwd failed: %v", err)
 		return "", err
 	}
 
-	repoStructure, err := optionalOverviewSection(settings.disableStructureOverview, structure.StructureOverview(settings.repoScanDepth), settings.verbose)
+	runSection := func(name string, disabled bool, fn func() resource.OverviewResource) (json.RawMessage, error) {
+		if disabled {
+			logf("%s: begin status=disabled", name)
+			return nil, nil
+		}
+		logf("%s: begin", name)
+		start := time.Now()
+		section, err := overviewSection(fn, settings.verbose)
+		dur := time.Since(start)
+		if err != nil {
+			logf("%s: end status=error dur=%s", name, dur)
+			return nil, err
+		}
+		if section == nil {
+			logf("%s: end status=omitted dur=%s", name, dur)
+			return nil, nil
+		}
+		logf("%s: end status=included dur=%s", name, dur)
+		return section, nil
+	}
+
+	repoStructure, err := runSection("structure", settings.disableStructureOverview, structure.StructureOverview(settings.repoScanDepth))
 	if err != nil {
 		return "", err
 	}
 
-	gitOverview, err := optionalOverviewSection(settings.disableGitOverview, git.GitOverview(settings.recentCommitCount), settings.verbose)
+	gitOverview, err := runSection("git", settings.disableGitOverview, git.GitOverview(settings.recentCommitCount))
 	if err != nil {
 		return "", err
 	}
 
-	workspaceContext, err := optionalOverviewSection(settings.disableWorkspaceOverview, parent.ParentOverview(settings.parentScanSettings()), settings.verbose)
+	workspaceContext, err := runSection("workspace", settings.disableWorkspaceOverview, parent.ParentOverview(settings.parentScanSettings()))
 	if err != nil {
 		return "", err
 	}
 
-	dependencies, err := optionalOverviewSection(settings.disableDependenciesOverview, deps.DepsOverview, settings.verbose)
+	dependencies, err := runSection("dependencies", settings.disableDependenciesOverview, deps.DepsOverview)
 	if err != nil {
 		return "", err
 	}
 
-	containerOverview, err := optionalOverviewSection(settings.disableContainerOverview, container.ContainerOverview, settings.verbose)
+	containerOverview, err := runSection("container", settings.disableContainerOverview, container.ContainerOverview)
 	if err != nil {
 		return "", err
 	}
 
-	projectTools, err := optionalOverviewSection(settings.disableToolsOverview, tools.ToolsOverview, settings.verbose)
+	projectTools, err := runSection("tools", settings.disableToolsOverview, tools.ToolsOverview)
 	if err != nil {
 		return "", err
 	}
 
-	cliOverview, err := optionalOverviewSection(!settings.enableCliOverview, cli.CLIOverview, settings.verbose)
+	cliOverview, err := runSection("cli", !settings.enableCliOverview, cli.CLIOverview)
 	if err != nil {
 		return "", err
 	}
 
-	opencodeOverview, err := optionalOverviewSection(!settings.enableOpencodeOverview, opencode.OpencodeOverview, settings.verbose)
+	opencodeOverview, err := runSection("opencode", !settings.enableOpencodeOverview, opencode.OpencodeOverview)
 	if err != nil {
 		return "", err
 	}
