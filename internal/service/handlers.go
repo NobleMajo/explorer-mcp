@@ -31,7 +31,7 @@ var readOnlyToolAnnotations = &mcpsdk.ToolAnnotations{
 func registerExploreTool(server *mcpsdk.Server, verbose bool) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
-		Description: "Workspace overview as JSON with repoStructure, gitOverview, workspaceContext, dependencies, containerOverview, projectTools, and agentBehaviorInstruction",
+		Description: "Workspace overview as JSON with repoStructure, gitOverview, workspaceContext, dependencies, containerOverview, projectTools, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
 		return jsonToolResult(func() (string, error) {
@@ -40,8 +40,8 @@ func registerExploreTool(server *mcpsdk.Server, verbose bool) {
 	})
 }
 
-var AgentBehaviorInstruction = map[string]string{
-	"general":   "You must strictly adhere to the specific behavior guidelines below whenever their corresponding metadata keys are present in the explorer payload. Always call this MCP endpoint when preparing the next development step, or whenever the project state, files, or execution context could have changed.",
+var AgentBehaviorMainInstruction = "You must strictly adhere to the specific behavior guidelines below whenever their corresponding metadata keys are present in the explorer payload. Always call this MCP endpoint when preparing the next development step, or whenever the project state, files, or execution context could have changed."
+var AgentBehaviorInstructions = map[string]string{
 	"container": "Do not restart or stop discovered containers if they mount local source code and use auto-restart policies. Analyze container execution via runtime logs, local configurations, and container metadata. Actively scan for: compose.yml, compose.yaml, docker-compose.yml, docker-compose.yaml, Dockerfile, *.dockerfile, the ./docker directory, and related runtime assets.",
 	"deps":      "Minimize dependencies. Avoid adding unused or redundant packages. Focus strictly on the target requirement and prefer native standard libraries where applicable. Locate dependency source code paths and verify if a specialized docs-mcp exists to analyze and predict external package behavior before making structural modifications.",
 	"git":       "When requested to recommend commits or perform a commit operation, always group uncommitted changes into distinct, logical atomic commits. For each proposed commit, provide exactly 3 structured commit message variants and a clear description of the specific changes. NEVER execute a commit autonomously unless explicitly and directly instructed to do so.",
@@ -58,8 +58,9 @@ type exploreResponse struct {
 	WorkspaceContext    json.RawMessage   `json:"workspaceContext"`
 	Dependencies        json.RawMessage   `json:"dependencies"`
 	ContainerOverview   json.RawMessage   `json:"containerOverview"`
-	ProjectTools        json.RawMessage   `json:"projectTools"`
-	BehaviorInstruction map[string]string `json:"agentBehaviorInstruction"`
+	ProjectTools                   json.RawMessage   `json:"projectTools"`
+	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction"`
+	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions"`
 }
 
 func buildExploreResponse(verbose bool) (string, error) {
@@ -118,8 +119,9 @@ func buildExploreResponse(verbose bool) (string, error) {
 		WorkspaceContext:    sections.workspaceContext,
 		Dependencies:        sections.dependencies,
 		ContainerOverview:   sections.containerOverview,
-		ProjectTools:        sections.projectTools,
-		BehaviorInstruction: buildAgentBehaviorInstructions(sections),
+		ProjectTools:                 sections.projectTools,
+		AgentBehaviorMainInstruction: AgentBehaviorMainInstruction,
+		AgentBehaviorInstructions:    buildAgentBehaviorInstructions(sections),
 	})
 }
 
@@ -133,15 +135,11 @@ var agentBehaviorInstructionDomains = []string{
 }
 
 func buildAgentBehaviorInstructions(sections exploreSections) map[string]string {
-	return buildAgentBehaviorInstructionsWith(sections, AgentBehaviorInstruction)
+	return buildAgentBehaviorInstructionsWith(sections, AgentBehaviorInstructions)
 }
 
 func buildAgentBehaviorInstructionsWith(sections exploreSections, catalog map[string]string) map[string]string {
 	instructions := make(map[string]string)
-
-	if text, ok := catalog["general"]; ok && text != "" {
-		instructions["general"] = text
-	}
 
 	for _, domainName := range agentBehaviorInstructionDomains {
 		if !shouldIncludeBehaviorHint(domainName, sections) {
@@ -168,8 +166,6 @@ type exploreSections struct {
 
 func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool {
 	switch domainName {
-	case "general":
-		return true
 	case "structure":
 		var structure struct {
 			EntryCount int `json:"entryCount"`

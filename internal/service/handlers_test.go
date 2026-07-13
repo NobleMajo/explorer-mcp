@@ -171,11 +171,15 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	assertSectionHasField(t, "projectTools", resp.ProjectTools, "makefileTargetCount")
 	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "projectRootPath")
 
-	for _, want := range []string{"general", "structure", "git", "parent", "deps", "container", "tools"} {
-		if _, ok := resp.BehaviorInstruction[want]; !ok {
-			t.Fatalf("expected agentBehaviorInstruction to include %q, got %v", want, resp.BehaviorInstruction)
+	if resp.AgentBehaviorMainInstruction != AgentBehaviorMainInstruction {
+		t.Fatalf("agentBehaviorMainInstruction = %q", resp.AgentBehaviorMainInstruction)
+	}
+
+	for _, want := range agentBehaviorInstructionDomains {
+		if _, ok := resp.AgentBehaviorInstructions[want]; !ok {
+			t.Fatalf("expected agentBehaviorInstructions to include %q, got %v", want, resp.AgentBehaviorInstructions)
 		}
-		if resp.BehaviorInstruction[want] != AgentBehaviorInstruction[want] {
+		if resp.AgentBehaviorInstructions[want] != AgentBehaviorInstructions[want] {
 			t.Fatalf("wrong instruction text for %q", want)
 		}
 	}
@@ -227,11 +231,8 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 		projectTools:      mustRawJSON(t, map[string]any{}),
 	})
 
-	if len(instructions) != 1 {
-		t.Fatalf("len(instructions) = %d, want 1", len(instructions))
-	}
-	if instructions["general"] != AgentBehaviorInstruction["general"] {
-		t.Fatal("expected only general instruction")
+	if len(instructions) != 0 {
+		t.Fatalf("len(instructions) = %d, want 0", len(instructions))
 	}
 }
 
@@ -410,12 +411,6 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			want: true,
 		},
 		{
-			name:   "general",
-			domain: "general",
-			sect:   exploreSections{},
-			want:   true,
-		},
-		{
 			name:   "unknown domain",
 			domain: "unknown",
 			sect:   exploreSections{},
@@ -502,21 +497,21 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 
 	instructions := buildAgentBehaviorInstructions(sections)
 
-	for _, domain := range append([]string{"general"}, agentBehaviorInstructionDomains...) {
-		if instructions[domain] != AgentBehaviorInstruction[domain] {
+	for _, domain := range agentBehaviorInstructionDomains {
+		if instructions[domain] != AgentBehaviorInstructions[domain] {
 			t.Fatalf("missing or wrong instruction for %q", domain)
 		}
 	}
-	if len(instructions) != 7 {
-		t.Fatalf("len(instructions) = %d, want 7", len(instructions))
+	if len(instructions) != len(agentBehaviorInstructionDomains) {
+		t.Fatalf("len(instructions) = %d, want %d", len(instructions), len(agentBehaviorInstructionDomains))
 	}
 }
 
 func TestBuildAgentBehaviorInstructionsSkipsEmptyDomainText(t *testing.T) {
 	t.Parallel()
 
-	catalog := make(map[string]string, len(AgentBehaviorInstruction))
-	for key, value := range AgentBehaviorInstruction {
+	catalog := make(map[string]string, len(AgentBehaviorInstructions))
+	for key, value := range AgentBehaviorInstructions {
 		catalog[key] = value
 	}
 	catalog["git"] = ""
