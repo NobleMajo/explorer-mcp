@@ -7,6 +7,10 @@ import (
 	"strings"
 )
 
+type ManifestLoader func(root, manifestPath string) (string, []string, bool, error)
+
+type ProjectIdentifier func(path string, subfiles []string, subdirs []string) ([]string, error)
+
 var KnownContainerFileNames = []string{
 	"compose.yml",
 	"compose.yaml",
@@ -33,10 +37,14 @@ var KnownContainerFileNames = []string{
 }
 
 var KnownContainerDirectoryNames = []string{
+	"container",
+	".container",
 	"docker",
+	".docker",
+	"podman",
+	".podman",
 	".devcontainer",
 	"deploy",
-	"containers",
 }
 
 var KnownContainerCLINames = []string{
@@ -103,8 +111,6 @@ var CommonCLIToolNames = []string{
 	"helm",
 }
 
-type ManifestLoader func(root, manifestPath string) (string, []string, bool, error)
-
 var ManifestLoaders = map[string]ManifestLoader{
 	"go.mod":           LoadGoModManifest,
 	"package.json":     LoadPackageJsonManifest,
@@ -113,12 +119,32 @@ var ManifestLoaders = map[string]ManifestLoader{
 	"pyproject.toml":   LoadPyprojectManifest,
 }
 
-var ManifestLoaderTags = map[string]string{
-	"go.mod":           "@go",
-	"package.json":     "@npm",
-	"requirements.txt": "@pip",
-	"Cargo.toml":       "@cargo",
-	"pyproject.toml":   "@python",
+var ProjectIdentifiers = []ProjectIdentifier{
+	identifyMakefileProject,
+	identifyTSConfigProject,
+	identifyAngularProject,
+}
+
+var ScanIgnoreFiles = []string{
+	".tmp",
+	"tmp",
+	".git",
+	".angular",
+	".cache",
+	"cache",
+	"__pycache__",
+	".pytest_cache",
+	".mypy_cache",
+	".ruff_cache",
+	".tox",
+	".nox",
+	".turbo",
+	".sass-cache",
+	".gradle",
+	"htmlcov",
+	".eslintcache",
+	".stylelintcache",
+	".tsbuildinfo",
 }
 
 func ManifestLoaderFileNames() []string {
@@ -185,14 +211,6 @@ func CollectSiblingProjectFlags(path string, subfiles, subdirs []string) ([]stri
 	return flags, nil
 }
 
-type ProjectIdentifier func(path string, subfiles []string, subdirs []string) ([]string, error)
-
-var ProjectIdentifiers = []ProjectIdentifier{
-	identifyMakefileProject,
-	identifyTSConfigProject,
-	identifyAngularProject,
-}
-
 func CollectProjectIdentifierFlags(path string, subfiles []string, subdirs []string) ([]string, error) {
 	flags := make([]string, 0)
 	for _, identify := range ProjectIdentifiers {
@@ -203,6 +221,15 @@ func CollectProjectIdentifierFlags(path string, subfiles []string, subdirs []str
 		flags = append(flags, found...)
 	}
 	return flags, nil
+}
+
+func IsScanIgnored(name string) bool {
+	for _, ignored := range ScanIgnoreFiles {
+		if ignored == name {
+			return true
+		}
+	}
+	return false
 }
 
 func identifyMakefileProject(path string, subfiles []string, subdirs []string) ([]string, error) {
@@ -251,38 +278,4 @@ func isTSConfigFileName(name string) bool {
 		return true
 	}
 	return strings.HasPrefix(name, "tsconfig.") && strings.HasSuffix(name, ".json")
-}
-
-var ScanIgnoreFiles = []string{
-	".tmp",
-	"tmp",
-	".git",
-	".angular",
-	".cache",
-	"cache",
-	"vendor",
-	"node_modules",
-}
-
-var IgnoreFiles = []string{
-	".gitignore",
-	".dockerignore",
-}
-
-func IsScanIgnored(name string) bool {
-	for _, ignored := range ScanIgnoreFiles {
-		if ignored == name {
-			return true
-		}
-	}
-	return false
-}
-
-func IsIgnoredFile(name string) bool {
-	for _, ignored := range IgnoreFiles {
-		if ignored == name {
-			return true
-		}
-	}
-	return false
 }

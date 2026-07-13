@@ -1152,8 +1152,6 @@ func TestBuildExploreResponseCollapsesProjectScanDirs(t *testing.T) {
 		disableContainerOverview:    true,
 		disableToolsOverview:        true,
 		projectScanDepth:            testProjectScanDepthForHandlers,
-		projectScanOutDirs:          true,
-		projectScanDepsDirs:         true,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)

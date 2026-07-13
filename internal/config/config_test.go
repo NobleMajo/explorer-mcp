@@ -49,10 +49,10 @@ func TestParseConfigProjectScanFlags(t *testing.T) {
 		t.Fatal("expected PrintAll true")
 	}
 	if !cfg.ProjectScanOutDirs {
-		t.Fatal("expected ProjectScanOutDirs true")
+		t.Fatal("expected ProjectScanOutDirs true when -U set")
 	}
 	if !cfg.ProjectScanDepsDirs {
-		t.Fatal("expected ProjectScanDepsDirs true")
+		t.Fatal("expected ProjectScanDepsDirs true when -J set")
 	}
 }
 
@@ -87,7 +87,7 @@ func TestParseConfigProjectScanDepthEnv(t *testing.T) {
 	}
 }
 
-func TestParseConfigProjectScanFlagsEnv(t *testing.T) {
+func TestParseConfigProjectScanFullListingEnv(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
 
@@ -97,10 +97,10 @@ func TestParseConfigProjectScanFlagsEnv(t *testing.T) {
 	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
 
 	if !cfg.ProjectScanOutDirs {
-		t.Fatal("expected PROJECT_SCAN_OUT_DIRS env to enable out dir collapse")
+		t.Fatal("expected PROJECT_SCAN_OUT_DIRS env to enable full out dir scan")
 	}
 	if !cfg.ProjectScanDepsDirs {
-		t.Fatal("expected PROJECT_SCAN_DEPS_DIRS env to enable deps dir collapse")
+		t.Fatal("expected PROJECT_SCAN_DEPS_DIRS env to enable full deps dir scan")
 	}
 }
 

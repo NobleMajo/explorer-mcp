@@ -15,8 +15,19 @@ func TestScanIgnoreGlobalsShape(t *testing.T) {
 		".angular",
 		".cache",
 		"cache",
-		"vendor",
-		"node_modules",
+		"__pycache__",
+		".pytest_cache",
+		".mypy_cache",
+		".ruff_cache",
+		".tox",
+		".nox",
+		".turbo",
+		".sass-cache",
+		".gradle",
+		"htmlcov",
+		".eslintcache",
+		".stylelintcache",
+		".tsbuildinfo",
 	}
 
 	if len(ScanIgnoreFiles) != len(want) {
@@ -39,41 +50,9 @@ func TestIsScanIgnoredCoversAllGlobals(t *testing.T) {
 		}
 	}
 
-	for _, name := range []string{"main.go", "src", ".gitignore", "README.md"} {
+	for _, name := range []string{"main.go", "src", ".gitignore", "README.md", "node_modules", "vendor"} {
 		if IsScanIgnored(name) {
 			t.Fatalf("IsScanIgnored(%q) = true, want false", name)
-		}
-	}
-}
-
-func TestIgnoreFilesGlobalsShape(t *testing.T) {
-	t.Parallel()
-
-	want := []string{".gitignore", ".dockerignore"}
-
-	if len(IgnoreFiles) != len(want) {
-		t.Fatalf("len(IgnoreFiles) = %d, want %d", len(IgnoreFiles), len(want))
-	}
-
-	for _, name := range want {
-		if !slices.Contains(IgnoreFiles, name) {
-			t.Fatalf("IgnoreFiles missing %q", name)
-		}
-	}
-}
-
-func TestIsIgnoredFileCoversAllGlobals(t *testing.T) {
-	t.Parallel()
-
-	for _, name := range IgnoreFiles {
-		if !IsIgnoredFile(name) {
-			t.Fatalf("IsIgnoredFile(%q) = false, want true", name)
-		}
-	}
-
-	for _, name := range []string{"main.go", "Dockerfile", "go.mod", ".git"} {
-		if IsIgnoredFile(name) {
-			t.Fatalf("IsIgnoredFile(%q) = true, want false", name)
 		}
 	}
 }

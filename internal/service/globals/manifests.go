@@ -19,7 +19,7 @@ func LoadGoModManifest(root, manifestPath string) (string, []string, bool, error
 		return "", nil, false, err
 	}
 
-	return ManifestLoaderTags["go.mod"], parseGoModRequire(string(data)), true, nil
+	return "@go", parseGoModRequire(string(data)), true, nil
 }
 
 func LoadPackageJsonManifest(root, manifestPath string) (string, []string, bool, error) {
@@ -49,7 +49,7 @@ func LoadPackageJsonManifest(root, manifestPath string) (string, []string, bool,
 	}
 
 	sort.Strings(entries)
-	return ManifestLoaderTags["package.json"], entries, true, nil
+	return "@npm", entries, true, nil
 }
 
 func LoadRequirementsManifest(root, manifestPath string) (string, []string, bool, error) {
@@ -83,7 +83,7 @@ func LoadRequirementsManifest(root, manifestPath string) (string, []string, bool
 	}
 
 	sort.Strings(entries)
-	return ManifestLoaderTags["requirements.txt"], entries, true, nil
+	return "@pip", entries, true, nil
 }
 
 func LoadCargoManifest(root, manifestPath string) (string, []string, bool, error) {
@@ -94,7 +94,7 @@ func LoadCargoManifest(root, manifestPath string) (string, []string, bool, error
 		}
 		return "", nil, false, err
 	}
-	return ManifestLoaderTags["Cargo.toml"], nil, true, nil
+	return "@cargo", nil, true, nil
 }
 
 func LoadPyprojectManifest(root, manifestPath string) (string, []string, bool, error) {
@@ -105,7 +105,7 @@ func LoadPyprojectManifest(root, manifestPath string) (string, []string, bool, e
 		}
 		return "", nil, false, err
 	}
-	return ManifestLoaderTags["pyproject.toml"], nil, true, nil
+	return "@python", nil, true, nil
 }
 
 func formatGoModuleDependency(name, version string, indirect bool) string {

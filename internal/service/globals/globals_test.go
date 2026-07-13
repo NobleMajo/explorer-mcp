@@ -11,7 +11,7 @@ func TestIsScanIgnored(t *testing.T) {
 		expected bool
 	}{
 		{name: "git dir", input: ".git", expected: true},
-		{name: "node_modules", input: "node_modules", expected: true},
+		{name: "__pycache__", input: "__pycache__", expected: true},
 		{name: "source file", input: "main.go", expected: false},
 		{name: "readme", input: "README.md", expected: false},
 	}
@@ -21,29 +21,6 @@ func TestIsScanIgnored(t *testing.T) {
 			t.Parallel()
 			if got := IsScanIgnored(tc.input); got != tc.expected {
 				t.Fatalf("IsScanIgnored(%q) = %v, want %v", tc.input, got, tc.expected)
-			}
-		})
-	}
-}
-
-func TestIsIgnoredFile(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name     string
-		input    string
-		expected bool
-	}{
-		{name: "gitignore", input: ".gitignore", expected: true},
-		{name: "dockerignore", input: ".dockerignore", expected: true},
-		{name: "go mod", input: "go.mod", expected: false},
-	}
-
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := IsIgnoredFile(tc.input); got != tc.expected {
-				t.Fatalf("IsIgnoredFile(%q) = %v, want %v", tc.input, got, tc.expected)
 			}
 		})
 	}

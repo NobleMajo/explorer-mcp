@@ -67,18 +67,20 @@ func appendStructureEntries(root, dir string, depth int, settings ScanSettings, 
 		}
 
 		if entry.IsDir() {
-			if settings.OutDirs && isOutputDir(entry.Name()) {
+			if isOutputDir(entry.Name()) && !settings.OutDirs {
 				*entries = append(*entries, filepath.ToSlash(relPath)+"/**")
 				continue
 			}
-			if settings.DepsDirs && isDepsDir(entry.Name()) {
+			if isDepsDir(entry.Name()) && !settings.DepsDirs {
 				*entries = append(*entries, filepath.ToSlash(relPath)+"/**")
 				continue
 			}
 		}
 
 		if globals.IsScanIgnored(entry.Name()) {
-			continue
+			if !(entry.IsDir() && settings.DepsDirs && isDepsDir(entry.Name())) {
+				continue
+			}
 		}
 		if entry.IsDir() && isDotDir(entry.Name()) {
 			continue
@@ -101,10 +103,6 @@ func appendStructureEntries(root, dir string, depth int, settings ScanSettings, 
 			continue
 		}
 
-		if globals.IsIgnoredFile(entry.Name()) {
-			continue
-		}
-
 		*entries = append(*entries, filepath.ToSlash(relPath))
 	}
 
@@ -119,25 +117,24 @@ func hasVisibleDescendants(dir string, settings ScanSettings) (bool, error) {
 
 	for _, entry := range dirEntries {
 		if entry.IsDir() {
-			if settings.OutDirs && isOutputDir(entry.Name()) {
+			if isOutputDir(entry.Name()) && !settings.OutDirs {
 				return true, nil
 			}
-			if settings.DepsDirs && isDepsDir(entry.Name()) {
+			if isDepsDir(entry.Name()) && !settings.DepsDirs {
 				return true, nil
 			}
 		}
 
 		if globals.IsScanIgnored(entry.Name()) {
-			continue
+			if !(entry.IsDir() && settings.DepsDirs && isDepsDir(entry.Name())) {
+				continue
+			}
 		}
 		if entry.IsDir() && isDotDir(entry.Name()) {
 			continue
 		}
 
 		if !entry.IsDir() {
-			if globals.IsIgnoredFile(entry.Name()) {
-				continue
-			}
 			return true, nil
 		}
 

@@ -240,13 +240,10 @@ func TestRepoStructureDoesNotFollowGitIgnore(t *testing.T) {
 
 	resp := result.(repoStructureResponse)
 	names := entryBaseNames(resp.Entries)
-	for _, want := range []string{"main.go", "out.go", "app.log"} {
+	for _, want := range []string{"main.go", "out.go", "app.log", ".gitignore"} {
 		if !slices.Contains(names, want) {
 			t.Fatalf("expected %q in entries, got %v", want, names)
 		}
-	}
-	if slices.Contains(names, ".gitignore") {
-		t.Fatalf("expected .gitignore omitted, entries=%v", names)
 	}
 }
 
@@ -277,7 +274,7 @@ func TestRepoStructureSkipsDotDirectories(t *testing.T) {
 	}
 }
 
-func TestRepoStructureListsOutDirContentsWhenCollapseDisabled(t *testing.T) {
+func TestRepoStructureCollapsesOutDirsByDefault(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(root+"/dist/nested", 0o755); err != nil {
 		t.Fatal(err)
@@ -292,15 +289,37 @@ func TestRepoStructureListsOutDirContentsWhenCollapseDisabled(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	if !slices.Contains(resp.Entries, "dist/nested/build.js") {
-		t.Fatalf("expected dist file listed when collapse disabled, got %v", resp.Entries)
+	if !slices.Contains(resp.Entries, "dist/**") {
+		t.Fatalf("expected dist/** by default, got %v", resp.Entries)
 	}
-	if slices.Contains(resp.Entries, "dist/**") {
-		t.Fatalf("expected no collapse marker when OutDirs disabled, got %v", resp.Entries)
+	for _, path := range resp.Entries {
+		if strings.Contains(path, "build.js") {
+			t.Fatalf("expected out dir collapsed by default, got %q", path)
+		}
 	}
 }
 
-func TestRepoStructureOmitsDepsDirsWhenCollapseDisabled(t *testing.T) {
+func TestRepoStructureListsOutDirContentsWhenScanEnabled(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/dist/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/dist/nested/build.js", "x\n")
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, OutDirs: true})()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	if !slices.Contains(resp.Entries, "dist/nested/build.js") {
+		t.Fatalf("expected dist file listed when out dir scan enabled, got %v", resp.Entries)
+	}
+}
+
+func TestRepoStructureCollapsesDepsDirsByDefault(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(root+"/node_modules/pkg", 0o755); err != nil {
 		t.Fatal(err)
@@ -315,14 +334,17 @@ func TestRepoStructureOmitsDepsDirsWhenCollapseDisabled(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
+	if !slices.Contains(resp.Entries, "node_modules/**") {
+		t.Fatalf("expected node_modules/** by default, got %v", resp.Entries)
+	}
 	for _, path := range resp.Entries {
-		if strings.Contains(path, "node_modules") || strings.Contains(path, "vendor") {
-			t.Fatalf("expected deps dirs omitted when collapse disabled, got %q", path)
+		if strings.Contains(path, "mod.go") {
+			t.Fatalf("expected deps dir collapsed by default, got %q", path)
 		}
 	}
 }
 
-func TestRepoStructureSkipsIgnoredEntriesWithDepsCollapseEnabled(t *testing.T) {
+func TestRepoStructureListsDepsWhenScanEnabled(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	if err := os.MkdirAll(root+"/node_modules/pkg", 0o755); err != nil {
@@ -337,13 +359,8 @@ func TestRepoStructureSkipsIgnoredEntriesWithDepsCollapseEnabled(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	if !slices.Contains(resp.Entries, "node_modules/**") {
-		t.Fatalf("expected node_modules/** with deps collapse, got %v", resp.Entries)
-	}
-	for _, path := range resp.Entries {
-		if strings.Contains(path, "mod.go") {
-			t.Fatalf("expected deps contents collapsed, got %q", path)
-		}
+	if !slices.Contains(resp.Entries, "node_modules/pkg/mod.go") {
+		t.Fatalf("expected deps dir contents when scan enabled, got %v", resp.Entries)
 	}
 }
 
@@ -357,7 +374,7 @@ func TestAppendStructureEntriesCollapseOutDirAtDepthLimit(t *testing.T) {
 	testutil.WriteFile(t, root+"/src/app.go", "package app\n")
 
 	entries := make([]string, 0)
-	settings := ScanSettings{Depth: maxDepth, OutDirs: true}
+	settings := ScanSettings{Depth: maxDepth}
 	if err := appendStructureEntries(root, root, 0, settings, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
@@ -396,7 +413,7 @@ func TestIsOutputDirAndIsDepsDir(t *testing.T) {
 	}
 }
 
-func TestRepoStructureCollapsesOutDirsWhenEnabled(t *testing.T) {
+func TestRepoStructureCollapsesAllOutDirNamesByDefault(t *testing.T) {
 	root := t.TempDir()
 	for _, dirName := range []string{"dist", "out", "output"} {
 		path := root + "/" + dirName
@@ -408,7 +425,7 @@ func TestRepoStructureCollapsesOutDirsWhenEnabled(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, OutDirs: true})()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -419,14 +436,9 @@ func TestRepoStructureCollapsesOutDirsWhenEnabled(t *testing.T) {
 			t.Fatalf("expected %q in entries, got %v", want, resp.Entries)
 		}
 	}
-	for _, path := range resp.Entries {
-		if strings.Contains(path, "build.js") {
-			t.Fatalf("expected out dir contents collapsed, got %q", path)
-		}
-	}
 }
 
-func TestRepoStructureCollapsesDepsDirsWhenEnabled(t *testing.T) {
+func TestRepoStructureCollapsesAllDepsDirNamesByDefault(t *testing.T) {
 	root := t.TempDir()
 	for _, dirName := range []string{"node_modules", "vendor"} {
 		path := root + "/" + dirName
@@ -438,7 +450,7 @@ func TestRepoStructureCollapsesDepsDirsWhenEnabled(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, DepsDirs: true})()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -447,11 +459,6 @@ func TestRepoStructureCollapsesDepsDirsWhenEnabled(t *testing.T) {
 	for _, want := range []string{"node_modules/**", "vendor/**", "main.go"} {
 		if !slices.Contains(resp.Entries, want) {
 			t.Fatalf("expected %q in entries, got %v", want, resp.Entries)
-		}
-	}
-	for _, path := range resp.Entries {
-		if strings.Contains(path, "mod.go") {
-			t.Fatalf("expected deps dir contents collapsed, got %q", path)
 		}
 	}
 }
@@ -475,10 +482,10 @@ func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	}
 }
 
-func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
+func TestAppendStructureEntriesIncludesIgnoreFiles(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
-	for _, fileName := range globals.IgnoreFiles {
+	for _, fileName := range []string{".gitignore", ".dockerignore"} {
 		testutil.WriteFile(t, root+"/"+fileName, "# ignore rules\n")
 	}
 
@@ -488,9 +495,9 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 	}
 
 	names := entryBaseNames(entries)
-	for _, fileName := range globals.IgnoreFiles {
-		if slices.Contains(names, fileName) {
-			t.Fatalf("expected %q to be skipped, entries=%v", fileName, names)
+	for _, fileName := range []string{".gitignore", ".dockerignore"} {
+		if !slices.Contains(names, fileName) {
+			t.Fatalf("expected %q in entries, got %v", fileName, names)
 		}
 	}
 	if !slices.Contains(names, "main.go") {

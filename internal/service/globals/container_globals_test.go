@@ -12,8 +12,8 @@ func TestKnownContainerGlobalsShape(t *testing.T) {
 	if len(KnownContainerFileNames) != 22 {
 		t.Fatalf("len(KnownContainerFileNames) = %d, want 22", len(KnownContainerFileNames))
 	}
-	if len(KnownContainerDirectoryNames) != 4 {
-		t.Fatalf("len(KnownContainerDirectoryNames) = %d, want 4", len(KnownContainerDirectoryNames))
+	if len(KnownContainerDirectoryNames) != 8 {
+		t.Fatalf("len(KnownContainerDirectoryNames) = %d, want 8", len(KnownContainerDirectoryNames))
 	}
 
 	globPatterns := 0
