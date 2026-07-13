@@ -9,28 +9,34 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
 
-type repoStructureResponse struct {
-	RepoScanDepthLimit *int     `json:"repoScanDepthLimit,omitempty"`
-	EntryCount         *int     `json:"entryCount,omitempty"`
-	Entries            []string `json:"entries,omitempty"`
+type ScanSettings struct {
+	Depth       int
+	OutDirs     bool
+	DepsDirs    bool
 }
 
-func buildRepoStructure(projectRootPath string, verbose bool, repoScanDepth int) (repoStructureResponse, error) {
+type repoStructureResponse struct {
+	ProjectScanDepthLimit *int     `json:"projectScanDepthLimit,omitempty"`
+	EntryCount            *int     `json:"entryCount,omitempty"`
+	Entries               []string `json:"entries,omitempty"`
+}
+
+func buildRepoStructure(projectRootPath string, verbose bool, settings ScanSettings) (repoStructureResponse, error) {
 	_ = verbose
-	if repoScanDepth < 1 {
+	if settings.Depth < 1 {
 		zero := 0
-		return repoStructureResponse{RepoScanDepthLimit: &zero}, nil
+		return repoStructureResponse{ProjectScanDepthLimit: &zero}, nil
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(projectRootPath, projectRootPath, 0, repoScanDepth, &entries); err != nil {
+	if err := appendStructureEntries(projectRootPath, projectRootPath, 0, settings, &entries); err != nil {
 		return repoStructureResponse{}, err
 	}
 
 	count := len(entries)
 	resp := repoStructureResponse{
-		RepoScanDepthLimit: &repoScanDepth,
-		EntryCount:         &count,
+		ProjectScanDepthLimit: &settings.Depth,
+		EntryCount:            &count,
 	}
 	if len(entries) > 0 {
 		resp.Entries = entries
@@ -39,8 +45,8 @@ func buildRepoStructure(projectRootPath string, verbose bool, repoScanDepth int)
 	return resp, nil
 }
 
-func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]string) error {
-	if depth >= maxDepth {
+func appendStructureEntries(root, dir string, depth int, settings ScanSettings, entries *[]string) error {
+	if depth >= settings.Depth {
 		return nil
 	}
 
@@ -54,13 +60,6 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 	})
 
 	for _, entry := range dirEntries {
-		if globals.IsScanIgnored(entry.Name()) {
-			continue
-		}
-		if entry.IsDir() && isDotDir(entry.Name()) {
-			continue
-		}
-
 		fullPath := filepath.Join(dir, entry.Name())
 		relPath, err := filepath.Rel(root, fullPath)
 		if err != nil {
@@ -68,8 +67,26 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 		}
 
 		if entry.IsDir() {
-			if depth+1 >= maxDepth {
-				hasMore, err := hasVisibleDescendants(fullPath)
+			if settings.OutDirs && isOutputDir(entry.Name()) {
+				*entries = append(*entries, filepath.ToSlash(relPath)+"/**")
+				continue
+			}
+			if settings.DepsDirs && isDepsDir(entry.Name()) {
+				*entries = append(*entries, filepath.ToSlash(relPath)+"/**")
+				continue
+			}
+		}
+
+		if globals.IsScanIgnored(entry.Name()) {
+			continue
+		}
+		if entry.IsDir() && isDotDir(entry.Name()) {
+			continue
+		}
+
+		if entry.IsDir() {
+			if depth+1 >= settings.Depth {
+				hasMore, err := hasVisibleDescendants(fullPath, settings)
 				if err != nil {
 					return err
 				}
@@ -78,7 +95,7 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 				}
 				continue
 			}
-			if err := appendStructureEntries(root, fullPath, depth+1, maxDepth, entries); err != nil {
+			if err := appendStructureEntries(root, fullPath, depth+1, settings, entries); err != nil {
 				return err
 			}
 			continue
@@ -94,13 +111,22 @@ func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]st
 	return nil
 }
 
-func hasVisibleDescendants(dir string) (bool, error) {
+func hasVisibleDescendants(dir string, settings ScanSettings) (bool, error) {
 	dirEntries, err := os.ReadDir(dir)
 	if err != nil {
 		return false, err
 	}
 
 	for _, entry := range dirEntries {
+		if entry.IsDir() {
+			if settings.OutDirs && isOutputDir(entry.Name()) {
+				return true, nil
+			}
+			if settings.DepsDirs && isDepsDir(entry.Name()) {
+				return true, nil
+			}
+		}
+
 		if globals.IsScanIgnored(entry.Name()) {
 			continue
 		}
@@ -116,7 +142,7 @@ func hasVisibleDescendants(dir string) (bool, error) {
 		}
 
 		childPath := filepath.Join(dir, entry.Name())
-		hasMore, err := hasVisibleDescendants(childPath)
+		hasMore, err := hasVisibleDescendants(childPath, settings)
 		if err != nil {
 			return false, err
 		}
@@ -130,4 +156,22 @@ func hasVisibleDescendants(dir string) (bool, error) {
 
 func isDotDir(name string) bool {
 	return strings.HasPrefix(name, ".")
+}
+
+func isOutputDir(name string) bool {
+	switch name {
+	case "dist", "out", "output":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDepsDir(name string) bool {
+	switch name {
+	case "node_modules", "vendor":
+		return true
+	default:
+		return false
+	}
 }

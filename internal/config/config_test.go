@@ -38,6 +38,72 @@ func TestParseConfigParentScanFlags(t *testing.T) {
 	}
 }
 
+func TestParseConfigProjectScanFlags(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-U", "-J"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.PrintAll {
+		t.Fatal("expected PrintAll true")
+	}
+	if !cfg.ProjectScanOutDirs {
+		t.Fatal("expected ProjectScanOutDirs true")
+	}
+	if !cfg.ProjectScanDepsDirs {
+		t.Fatal("expected ProjectScanDepsDirs true")
+	}
+}
+
+func TestParseConfigProjectScanDefaults(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.ProjectScanDepth != 6 {
+		t.Fatalf("ProjectScanDepth = %d, want 6", cfg.ProjectScanDepth)
+	}
+	if cfg.ProjectScanOutDirs {
+		t.Fatal("expected ProjectScanOutDirs false by default")
+	}
+	if cfg.ProjectScanDepsDirs {
+		t.Fatal("expected ProjectScanDepsDirs false by default")
+	}
+}
+
+func TestParseConfigProjectScanDepthEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("PROJECT_SCAN_DEPTH", "4")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.ProjectScanDepth != 4 {
+		t.Fatalf("ProjectScanDepth = %d, want 4", cfg.ProjectScanDepth)
+	}
+}
+
+func TestParseConfigProjectScanFlagsEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("PROJECT_SCAN_OUT_DIRS", "true")
+	t.Setenv("PROJECT_SCAN_DEPS_DIRS", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.ProjectScanOutDirs {
+		t.Fatal("expected PROJECT_SCAN_OUT_DIRS env to enable out dir collapse")
+	}
+	if !cfg.ProjectScanDepsDirs {
+		t.Fatal("expected PROJECT_SCAN_DEPS_DIRS env to enable deps dir collapse")
+	}
+}
+
 func TestParseConfigPrintExploreFlags(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
@@ -59,8 +125,8 @@ func TestParseConfigPrintExploreFlags(t *testing.T) {
 	if cfg.ParentScanDepth != 1 {
 		t.Fatalf("ParentScanDepth = %d, want 1", cfg.ParentScanDepth)
 	}
-	if cfg.RepoScanDepth != 2 {
-		t.Fatalf("RepoScanDepth = %d, want 2", cfg.RepoScanDepth)
+	if cfg.ProjectScanDepth != 2 {
+		t.Fatalf("ProjectScanDepth = %d, want 2", cfg.ProjectScanDepth)
 	}
 	if cfg.EnableBehaviorInstruction {
 		t.Fatal("expected EnableBehaviorInstruction false by default")
@@ -196,8 +262,8 @@ func TestParseConfigExploreFlagsBeforePrint(t *testing.T) {
 	if cfg.RecentCommitCount != 0 {
 		t.Fatalf("RecentCommitCount = %d, want 0", cfg.RecentCommitCount)
 	}
-	if cfg.RepoScanDepth != 0 {
-		t.Fatalf("RepoScanDepth = %d, want 0", cfg.RepoScanDepth)
+	if cfg.ProjectScanDepth != 0 {
+		t.Fatalf("ProjectScanDepth = %d, want 0", cfg.ProjectScanDepth)
 	}
 }
 

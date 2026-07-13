@@ -5,6 +5,7 @@ import (
 
 	"github.com/NobleMajo/explorer-mcp/internal/config"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/parent"
+	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/structure"
 )
 
 var ErrAllOverviewsDisabled = errors.New("all overviews are disabled; enable at least one overview section")
@@ -15,7 +16,9 @@ type exploreSettings struct {
 	parentScanDepth             int
 	parentScanDotDirs           bool
 	parentScanHomeDir           bool
-	repoScanDepth               int
+	projectScanDepth            int
+	projectScanOutDirs          bool
+	projectScanDepsDirs         bool
 	enableBehaviorInstruction   bool
 	disableStructureOverview    bool
 	disableGitOverview          bool
@@ -38,7 +41,9 @@ func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
 		parentScanDepth:             cfg.ParentScanDepth,
 		parentScanDotDirs:           cfg.ParentScanDotDirs,
 		parentScanHomeDir:           cfg.ParentScanHomeDir,
-		repoScanDepth:               cfg.RepoScanDepth,
+		projectScanDepth:            cfg.ProjectScanDepth,
+		projectScanOutDirs:          cfg.ProjectScanOutDirs,
+		projectScanDepsDirs:         cfg.ProjectScanDepsDirs,
 		enableBehaviorInstruction:   cfg.EnableBehaviorInstruction,
 		disableStructureOverview:    cfg.DisableStructureOverview,
 		disableGitOverview:          cfg.DisableGitOverview,
@@ -56,6 +61,14 @@ func (s exploreSettings) parentScanSettings() parent.ScanSettings {
 		Depth:       s.parentScanDepth,
 		ScanDotDirs: s.parentScanDotDirs,
 		ScanHomeDir: s.parentScanHomeDir,
+	}
+}
+
+func (s exploreSettings) projectScanSettings() structure.ScanSettings {
+	return structure.ScanSettings{
+		Depth:    s.projectScanDepth,
+		OutDirs:  s.projectScanOutDirs,
+		DepsDirs: s.projectScanDepsDirs,
 	}
 }
 

@@ -86,7 +86,7 @@ var AgentBehaviorInstructions = map[string]string{
 	"git":       "When requested to recommend commits or perform a commit operation, always group uncommitted changes into distinct, logical atomic commits. For each proposed commit, provide exactly 3 structured commit message variants and a clear description of the specific changes. NEVER execute a commit autonomously unless explicitly and directly instructed to do so.",
 	"opencode":  "If OpenCode permissions are present, give preference to 'Allow' over 'Ask'. Always order commands, subcommands, flags and arguments in the permitted way. If a prompt relates to an existing MCP server, use read-only operations such as 'docs' and 'explore' to gain more context before starting the task.",
 	"parent":    "Scan parent and sibling directories to identify external dependencies, architectural services, cross-project tools, or related microservices that reside adjacent to the current workspace root directory.",
-	"structure": "Strict adherence to the established project layout is mandatory. Do not alter the directory schema unless the requested feature explicitly forces a deviation from current file and folder patterns. Analyze the existing codebase layout to derive and follow local structural conventions and architectural design patterns. Entries ending in /** mark directories that contain additional files or subdirectories below repoScanDepthLimit; treat them as proof that deeper layout exists even though those paths are not listed.",
+	"structure": "Strict adherence to the established project layout is mandatory. Do not alter the directory schema unless the requested feature explicitly forces a deviation from current file and folder patterns. Analyze the existing codebase layout to derive and follow local structural conventions and architectural design patterns. Entries ending in /** mark directories that contain additional files or subdirectories below projectScanDepthLimit; treat them as proof that deeper layout exists even though those paths are not listed.",
 	"tools":     "Analyze and inventory existing tooling configurations for testing, linting, building, executing, and container orchestration. Prioritize utilizing predefined Makefile targets, local scripts, and existing automation tools over generating new standalone commands or chaining raw shell operations.",
 }
 
@@ -156,7 +156,7 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		return section, nil
 	}
 
-	repoStructure, err := runSection("structure", settings.disableStructureOverview, structure.StructureOverview(settings.repoScanDepth))
+	repoStructure, err := runSection("structure", settings.disableStructureOverview, structure.StructureOverview(settings.projectScanSettings()))
 	if err != nil {
 		return "", err
 	}
@@ -278,13 +278,13 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 	switch domainName {
 	case "structure":
 		var structure struct {
-			RepoScanDepthLimit int `json:"repoScanDepthLimit"`
-			EntryCount         int `json:"entryCount"`
+			ProjectScanDepthLimit int `json:"projectScanDepthLimit"`
+			EntryCount            int `json:"entryCount"`
 		}
 		if json.Unmarshal(sections.structure, &structure) != nil {
 			return false
 		}
-		if structure.RepoScanDepthLimit < 1 {
+		if structure.ProjectScanDepthLimit < 1 {
 			return false
 		}
 		return structure.EntryCount > 0

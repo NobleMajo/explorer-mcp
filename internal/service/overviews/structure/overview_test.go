@@ -10,7 +10,11 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
-const testRepoScanDepth = 7
+const testProjectScanDepth = 7
+
+func testScanSettings(depth int) ScanSettings {
+	return ScanSettings{Depth: depth}
+}
 
 func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 	root := t.TempDir()
@@ -35,7 +39,7 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -72,14 +76,14 @@ func TestRepoStructureDepthZero(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(0)()(root, false)
+	result, err := StructureOverview(testScanSettings(0))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
 
 	resp := result.(repoStructureResponse)
-	if resp.RepoScanDepthLimit == nil || *resp.RepoScanDepthLimit != 0 {
-		t.Fatalf("repoScanDepthLimit = %v, want 0", resp.RepoScanDepthLimit)
+	if resp.ProjectScanDepthLimit == nil || *resp.ProjectScanDepthLimit != 0 {
+		t.Fatalf("projectScanDepthLimit = %v, want 0", resp.ProjectScanDepthLimit)
 	}
 	if resp.EntryCount != nil || len(resp.Entries) != 0 {
 		t.Fatalf("expected no entries, got %+v", resp)
@@ -96,7 +100,7 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	testutil.WriteFile(t, root+"/afile.go", "package a\n")
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, testRepoScanDepth, &entries); err != nil {
+	if err := appendStructureEntries(root, root, 0, testScanSettings(testProjectScanDepth), &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -129,7 +133,7 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, maxDepth, &entries); err != nil {
+	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: maxDepth}, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -162,7 +166,7 @@ func TestAppendStructureEntriesMarksDeeperDirectories(t *testing.T) {
 	testutil.WriteFile(t, root+"/internal/config/config.go", "package config\n")
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, maxDepth, &entries); err != nil {
+	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: maxDepth}, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -189,7 +193,7 @@ func TestAppendStructureEntriesOmitsMarkerForEmptyDirectory(t *testing.T) {
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, 2, &entries); err != nil {
+	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: 2}, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -206,14 +210,14 @@ func TestRepoStructureIncludesScanDepthLimit(t *testing.T) {
 	testutil.Chdir(t, root)
 
 	const depth = 4
-	result, err := StructureOverview(depth)()(root, false)
+	result, err := StructureOverview(testScanSettings(depth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
 
 	resp := result.(repoStructureResponse)
-	if resp.RepoScanDepthLimit == nil || *resp.RepoScanDepthLimit != depth {
-		t.Fatalf("repoScanDepthLimit = %v, want %d", resp.RepoScanDepthLimit, depth)
+	if resp.ProjectScanDepthLimit == nil || *resp.ProjectScanDepthLimit != depth {
+		t.Fatalf("projectScanDepthLimit = %v, want %d", resp.ProjectScanDepthLimit, depth)
 	}
 }
 
@@ -229,7 +233,7 @@ func TestRepoStructureDoesNotFollowGitIgnore(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -256,7 +260,7 @@ func TestRepoStructureSkipsDotDirectories(t *testing.T) {
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -273,13 +277,192 @@ func TestRepoStructureSkipsDotDirectories(t *testing.T) {
 	}
 }
 
+func TestRepoStructureListsOutDirContentsWhenCollapseDisabled(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/dist/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/dist/nested/build.js", "x\n")
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	if !slices.Contains(resp.Entries, "dist/nested/build.js") {
+		t.Fatalf("expected dist file listed when collapse disabled, got %v", resp.Entries)
+	}
+	if slices.Contains(resp.Entries, "dist/**") {
+		t.Fatalf("expected no collapse marker when OutDirs disabled, got %v", resp.Entries)
+	}
+}
+
+func TestRepoStructureOmitsDepsDirsWhenCollapseDisabled(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/node_modules/pkg", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/node_modules/pkg/mod.go", "package pkg\n")
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	for _, path := range resp.Entries {
+		if strings.Contains(path, "node_modules") || strings.Contains(path, "vendor") {
+			t.Fatalf("expected deps dirs omitted when collapse disabled, got %q", path)
+		}
+	}
+}
+
+func TestRepoStructureSkipsIgnoredEntriesWithDepsCollapseEnabled(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	if err := os.MkdirAll(root+"/node_modules/pkg", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/node_modules/pkg/mod.go", "package pkg\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, DepsDirs: true})()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	if !slices.Contains(resp.Entries, "node_modules/**") {
+		t.Fatalf("expected node_modules/** with deps collapse, got %v", resp.Entries)
+	}
+	for _, path := range resp.Entries {
+		if strings.Contains(path, "mod.go") {
+			t.Fatalf("expected deps contents collapsed, got %q", path)
+		}
+	}
+}
+
+func TestAppendStructureEntriesCollapseOutDirAtDepthLimit(t *testing.T) {
+	const maxDepth = 2
+	root := t.TempDir()
+	if err := os.MkdirAll(root+"/src/dist/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/src/dist/nested/build.js", "x\n")
+	testutil.WriteFile(t, root+"/src/app.go", "package app\n")
+
+	entries := make([]string, 0)
+	settings := ScanSettings{Depth: maxDepth, OutDirs: true}
+	if err := appendStructureEntries(root, root, 0, settings, &entries); err != nil {
+		t.Fatalf("appendStructureEntries() error: %v", err)
+	}
+
+	if !slices.Contains(entries, "src/app.go") {
+		t.Fatalf("expected src/app.go, got %v", entries)
+	}
+	if !slices.Contains(entries, "src/dist/**") {
+		t.Fatalf("expected nested out dir collapsed at depth limit, got %v", entries)
+	}
+	if slices.Contains(entries, "src/**") {
+		t.Fatalf("expected src expanded until out dir, got %v", entries)
+	}
+}
+
+func TestIsOutputDirAndIsDepsDir(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"dist", "out", "output"} {
+		if !isOutputDir(name) {
+			t.Fatalf("expected %q to be output dir", name)
+		}
+	}
+	for _, name := range []string{"node_modules", "vendor"} {
+		if !isDepsDir(name) {
+			t.Fatalf("expected %q to be deps dir", name)
+		}
+	}
+	for _, name := range []string{"build", "dist-extra", "myout", "src", "node_module"} {
+		if isOutputDir(name) {
+			t.Fatalf("expected %q not to be output dir", name)
+		}
+		if isDepsDir(name) {
+			t.Fatalf("expected %q not to be deps dir", name)
+		}
+	}
+}
+
+func TestRepoStructureCollapsesOutDirsWhenEnabled(t *testing.T) {
+	root := t.TempDir()
+	for _, dirName := range []string{"dist", "out", "output"} {
+		path := root + "/" + dirName
+		if err := os.MkdirAll(path+"/nested", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.WriteFile(t, path+"/nested/build.js", "x\n")
+	}
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, OutDirs: true})()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	for _, want := range []string{"dist/**", "out/**", "output/**", "main.go"} {
+		if !slices.Contains(resp.Entries, want) {
+			t.Fatalf("expected %q in entries, got %v", want, resp.Entries)
+		}
+	}
+	for _, path := range resp.Entries {
+		if strings.Contains(path, "build.js") {
+			t.Fatalf("expected out dir contents collapsed, got %q", path)
+		}
+	}
+}
+
+func TestRepoStructureCollapsesDepsDirsWhenEnabled(t *testing.T) {
+	root := t.TempDir()
+	for _, dirName := range []string{"node_modules", "vendor"} {
+		path := root + "/" + dirName
+		if err := os.MkdirAll(path+"/pkg", 0o755); err != nil {
+			t.Fatal(err)
+		}
+		testutil.WriteFile(t, path+"/pkg/mod.go", "package pkg\n")
+	}
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(ScanSettings{Depth: testProjectScanDepth, DepsDirs: true})()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	for _, want := range []string{"node_modules/**", "vendor/**", "main.go"} {
+		if !slices.Contains(resp.Entries, want) {
+			t.Fatalf("expected %q in entries, got %v", want, resp.Entries)
+		}
+	}
+	for _, path := range resp.Entries {
+		if strings.Contains(path, "mod.go") {
+			t.Fatalf("expected deps dir contents collapsed, got %q", path)
+		}
+	}
+}
+
 func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/.env", "PORT=8080\n")
 	testutil.WriteFile(t, root+"/.env.project", "PROJECT_VERSION=1.0.0\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview(testRepoScanDepth)()(root, false)
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -300,7 +483,7 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, testRepoScanDepth, &entries); err != nil {
+	if err := appendStructureEntries(root, root, 0, testScanSettings(testProjectScanDepth), &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -317,7 +500,7 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 
 func TestAppendStructureEntriesMissingDir(t *testing.T) {
 	entries := make([]string, 0)
-	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, testRepoScanDepth, &entries)
+	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, testScanSettings(testProjectScanDepth), &entries)
 	if err == nil {
 		t.Fatal("expected error for missing directory")
 	}

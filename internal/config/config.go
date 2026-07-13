@@ -14,11 +14,15 @@ type AppConfig struct {
 
 	PrintAll bool
 
-	RecentCommitCount           int
-	ParentScanDepth             int
-	ParentScanDotDirs           bool
-	ParentScanHomeDir           bool
-	RepoScanDepth               int
+	RecentCommitCount int
+	ParentScanDepth   int
+	ParentScanDotDirs bool
+	ParentScanHomeDir bool
+
+	ProjectScanOutDirs  bool
+	ProjectScanDepsDirs bool
+	ProjectScanDepth    int
+
 	DisableStructureOverview    bool
 	DisableGitOverview          bool
 	DisableWorkspaceOverview    bool
@@ -42,7 +46,10 @@ func defaultAppConfig() *AppConfig {
 		ParentScanDepth:   2,
 		ParentScanDotDirs: false,
 		ParentScanHomeDir: false,
-		RepoScanDepth:     6,
+
+		ProjectScanOutDirs:  false,
+		ProjectScanDepsDirs: false,
+		ProjectScanDepth:    6,
 
 		DisableStructureOverview:    false,
 		DisableGitOverview:          false,
@@ -94,14 +101,20 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsInt("PARENT_SCAN_DEPTH", func(value int) {
 		appConfig.ParentScanDepth = value
 	})
-	EnvIsInt("REPO_SCAN_DEPTH", func(value int) {
-		appConfig.RepoScanDepth = value
+	EnvIsInt("PROJECT_SCAN_DEPTH", func(value int) {
+		appConfig.ProjectScanDepth = value
 	})
 	EnvIsBool("PARENT_SCAN_DOT_DIRS", func(value bool) {
 		appConfig.ParentScanDotDirs = value
 	})
 	EnvIsBool("PARENT_SCAN_HOME_DIR", func(value bool) {
 		appConfig.ParentScanHomeDir = value
+	})
+	EnvIsBool("PROJECT_SCAN_OUT_DIRS", func(value bool) {
+		appConfig.ProjectScanOutDirs = value
+	})
+	EnvIsBool("PROJECT_SCAN_DEPS_DIRS", func(value bool) {
+		appConfig.ProjectScanDepsDirs = value
 	})
 	EnvIsBool("DISABLE_STRUCTURE_OVERVIEW", func(value bool) {
 		appConfig.DisableStructureOverview = value
@@ -138,7 +151,9 @@ func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().IntVarP(&appConfig.ParentScanDepth, "parent-scan-depth", "p", appConfig.ParentScanDepth, "parent directory scan depth (PARENT_SCAN_DEPTH)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanDotDirs, "parent-scan-dot-dirs", "D", appConfig.ParentScanDotDirs, "include dot directories during parent scan (PARENT_SCAN_DOT_DIRS)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanHomeDir, "parent-scan-home-dir", "H", appConfig.ParentScanHomeDir, "include home directory during parent scan (PARENT_SCAN_HOME_DIR)")
-	cmd.PersistentFlags().IntVarP(&appConfig.RepoScanDepth, "repo-scan-depth", "d", appConfig.RepoScanDepth, "repo structure scan depth (REPO_SCAN_DEPTH)")
+	cmd.PersistentFlags().IntVarP(&appConfig.ProjectScanDepth, "project-scan-depth", "d", appConfig.ProjectScanDepth, "project structure scan depth (PROJECT_SCAN_DEPTH)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.ProjectScanOutDirs, "project-scan-out-dirs", "U", appConfig.ProjectScanOutDirs, "collapse dist, out and output directories to /** in structure scan (PROJECT_SCAN_OUT_DIRS)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.ProjectScanDepsDirs, "project-scan-deps-dirs", "J", appConfig.ProjectScanDepsDirs, "collapse node_modules and vendor directories to /** in structure scan (PROJECT_SCAN_DEPS_DIRS)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableStructureOverview, "disable-structure", "S", appConfig.DisableStructureOverview, "omit structure overview (DISABLE_STRUCTURE_OVERVIEW)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableGitOverview, "disable-git", "G", appConfig.DisableGitOverview, "omit git overview (DISABLE_GIT_OVERVIEW)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableWorkspaceOverview, "disable-workspace", "W", appConfig.DisableWorkspaceOverview, "omit workspace overview (DISABLE_WORKSPACE_OVERVIEW)")

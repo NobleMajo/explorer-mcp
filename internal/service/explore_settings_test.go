@@ -88,7 +88,9 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		ParentScanDepth:             4,
 		ParentScanDotDirs:           true,
 		ParentScanHomeDir:           true,
-		RepoScanDepth:               3,
+		ProjectScanDepth:            3,
+		ProjectScanOutDirs:          true,
+		ProjectScanDepsDirs:         true,
 		EnableBehaviorInstruction:   true,
 		DisableStructureOverview:    true,
 		DisableGitOverview:          true,
@@ -106,7 +108,9 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.parentScanDepth != cfg.ParentScanDepth ||
 		settings.parentScanDotDirs != cfg.ParentScanDotDirs ||
 		settings.parentScanHomeDir != cfg.ParentScanHomeDir ||
-		settings.repoScanDepth != cfg.RepoScanDepth ||
+		settings.projectScanDepth != cfg.ProjectScanDepth ||
+		settings.projectScanOutDirs != cfg.ProjectScanOutDirs ||
+		settings.projectScanDepsDirs != cfg.ProjectScanDepsDirs ||
 		settings.enableBehaviorInstruction != cfg.EnableBehaviorInstruction ||
 		settings.disableStructureOverview != cfg.DisableStructureOverview ||
 		settings.disableGitOverview != cfg.DisableGitOverview ||
@@ -121,6 +125,28 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 
 	if settings.parentScanSettings().Depth != cfg.ParentScanDepth {
 		t.Fatalf("parentScanSettings().Depth = %d, want %d", settings.parentScanSettings().Depth, cfg.ParentScanDepth)
+	}
+	if settings.projectScanSettings().Depth != cfg.ProjectScanDepth {
+		t.Fatalf("projectScanSettings().Depth = %d, want %d", settings.projectScanSettings().Depth, cfg.ProjectScanDepth)
+	}
+}
+
+func TestProjectScanSettingsMapsCollapseFlags(t *testing.T) {
+	settings := exploreSettings{
+		projectScanDepth:    5,
+		projectScanOutDirs:  true,
+		projectScanDepsDirs: true,
+	}
+
+	scan := settings.projectScanSettings()
+	if scan.Depth != 5 {
+		t.Fatalf("Depth = %d, want 5", scan.Depth)
+	}
+	if !scan.OutDirs {
+		t.Fatal("expected OutDirs true")
+	}
+	if !scan.DepsDirs {
+		t.Fatal("expected DepsDirs true")
 	}
 }
 

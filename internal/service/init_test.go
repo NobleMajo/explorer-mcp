@@ -15,7 +15,7 @@ func TestDirectJsonResultUsesConfigSettings(t *testing.T) {
 
 	out, err := DirectJsonResult(&config.AppConfig{
 		DisableStructureOverview: true,
-		RepoScanDepth:            6,
+		ProjectScanDepth:         6,
 	})
 	if err != nil {
 		t.Fatalf("DirectJsonResult() error: %v", err)
