@@ -1,8 +1,10 @@
-package service
+package globals
 
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
 func TestParseGoModRequire(t *testing.T) {
@@ -24,7 +26,7 @@ require github.com/single/dep v9.9.9
 		t.Fatalf("len(deps) = %d, want 3", len(deps))
 	}
 
-	byName := make(map[string]goDependency, len(deps))
+	byName := make(map[string]GoDependency, len(deps))
 	for _, dep := range deps {
 		byName[dep.PackageName] = dep
 	}
@@ -49,8 +51,8 @@ func TestSortedManifestKeys(t *testing.T) {
 	t.Parallel()
 
 	keys := sortedManifestKeys(map[string]string{
-		"zeta": "1",
-		"alpha": "2",
+		"zeta":   "1",
+		"alpha":  "2",
 		"middle": "3",
 	})
 
@@ -77,9 +79,18 @@ func TestParseGoModRequireLineInvalid(t *testing.T) {
 func TestLoadGoModManifestMissingFile(t *testing.T) {
 	t.Parallel()
 
-	_, err := loadGoModManifest(t.TempDir(), "/does/not/exist/go.mod")
+	_, err := LoadGoModManifest(t.TempDir(), "/does/not/exist/go.mod")
 	if err == nil {
 		t.Fatal("expected error for missing go.mod")
+	}
+}
+
+func TestLoadPackageJsonManifestMissingFile(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadPackageJsonManifest(t.TempDir(), "/does/not/exist/package.json")
+	if err == nil {
+		t.Fatal("expected error for missing package.json")
 	}
 }
 
@@ -88,9 +99,9 @@ func TestLoadPackageJsonManifestInvalidJSON(t *testing.T) {
 
 	root := t.TempDir()
 	path := filepath.Join(root, "package.json")
-	writeFile(t, path, `{invalid`)
+	testutil.WriteFile(t, path, `{invalid`)
 
-	_, err := loadPackageJsonManifest(root, path)
+	_, err := LoadPackageJsonManifest(root, path)
 	if err == nil {
 		t.Fatal("expected error for invalid package.json")
 	}
@@ -101,11 +112,11 @@ func TestLoadGoModManifest(t *testing.T) {
 
 	root := t.TempDir()
 	path := filepath.Join(root, "go.mod")
-	writeFile(t, path, "module test\n\nrequire github.com/foo/bar v1.0.0\n")
+	testutil.WriteFile(t, path, "module test\n\nrequire github.com/foo/bar v1.0.0\n")
 
-	got, err := loadGoModManifest(root, path)
+	got, err := LoadGoModManifest(root, path)
 	if err != nil {
-		t.Fatalf("loadGoModManifest() error: %v", err)
+		t.Fatalf("LoadGoModManifest() error: %v", err)
 	}
 	if got.EcosystemName != "go" || !got.IsParsed || got.DependencyCount != 1 {
 		t.Fatalf("unexpected result: %+v", got)
@@ -117,11 +128,11 @@ func TestLoadPackageJsonManifest(t *testing.T) {
 
 	root := t.TempDir()
 	path := filepath.Join(root, "package.json")
-	writeFile(t, path, `{"dependencies":{"alpha":"1.0.0"},"devDependencies":{"eslint":"9.0.0"}}`)
+	testutil.WriteFile(t, path, `{"dependencies":{"alpha":"1.0.0"},"devDependencies":{"eslint":"9.0.0"}}`)
 
-	got, err := loadPackageJsonManifest(root, path)
+	got, err := LoadPackageJsonManifest(root, path)
 	if err != nil {
-		t.Fatalf("loadPackageJsonManifest() error: %v", err)
+		t.Fatalf("LoadPackageJsonManifest() error: %v", err)
 	}
 	if got.EcosystemName != "node" || !got.IsParsed || len(got.DependencyGroups) != 2 {
 		t.Fatalf("unexpected result: %+v", got)
@@ -133,11 +144,11 @@ func TestLoadRequirementsManifest(t *testing.T) {
 
 	root := t.TempDir()
 	path := filepath.Join(root, "requirements.txt")
-	writeFile(t, path, "# comment\nrequests==2.28.0\nflask>=3.0.0\n\n")
+	testutil.WriteFile(t, path, "# comment\nrequests==2.28.0\nflask>=3.0.0\n\n")
 
-	got, err := loadRequirementsManifest(root, path)
+	got, err := LoadRequirementsManifest(root, path)
 	if err != nil {
-		t.Fatalf("loadRequirementsManifest() error: %v", err)
+		t.Fatalf("LoadRequirementsManifest() error: %v", err)
 	}
 	if !got.IsParsed || len(got.DependencyGroups) != 1 {
 		t.Fatalf("unexpected groups: %+v", got.DependencyGroups)
@@ -148,16 +159,75 @@ func TestLoadRequirementsManifest(t *testing.T) {
 	}
 }
 
+func TestLoadRequirementsManifestMissingFile(t *testing.T) {
+	t.Parallel()
+
+	_, err := LoadRequirementsManifest(t.TempDir(), "/does/not/exist/requirements.txt")
+	if err == nil {
+		t.Fatal("expected error for missing requirements.txt")
+	}
+}
+
+func TestLoadRequirementsManifestInlineComment(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "requirements.txt")
+	testutil.WriteFile(t, path, "requests==2.28.0 # pinned\n")
+
+	got, err := LoadRequirementsManifest(root, path)
+	if err != nil {
+		t.Fatalf("LoadRequirementsManifest() error: %v", err)
+	}
+	names := got.DependencyGroups[0].PackageNames
+	if len(names) != 1 || names[0] != "requests" {
+		t.Fatalf("unexpected package names: %#v", names)
+	}
+}
+
+func TestLoadRequirementsManifestPlainPackageName(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "requirements.txt")
+	testutil.WriteFile(t, path, "requests\n")
+
+	got, err := LoadRequirementsManifest(root, path)
+	if err != nil {
+		t.Fatalf("LoadRequirementsManifest() error: %v", err)
+	}
+	names := got.DependencyGroups[0].PackageNames
+	if len(names) != 1 || names[0] != "requests" {
+		t.Fatalf("unexpected package names: %#v", names)
+	}
+}
+
+func TestLoadRequirementsManifestEmptyFile(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "requirements.txt")
+	testutil.WriteFile(t, path, "")
+
+	got, err := LoadRequirementsManifest(root, path)
+	if err != nil {
+		t.Fatalf("LoadRequirementsManifest() error: %v", err)
+	}
+	if !got.IsParsed || len(got.DependencyGroups) != 1 || len(got.DependencyGroups[0].PackageNames) != 0 {
+		t.Fatalf("unexpected empty requirements result: %+v", got)
+	}
+}
+
 func TestLoadCargoManifestDetectOnly(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	path := filepath.Join(root, "Cargo.toml")
-	writeFile(t, path, "[package]\nname = \"demo\"\n")
+	testutil.WriteFile(t, path, "[package]\nname = \"demo\"\n")
 
-	got, err := loadCargoManifest(root, path)
+	got, err := LoadCargoManifest(root, path)
 	if err != nil {
-		t.Fatalf("loadCargoManifest() error: %v", err)
+		t.Fatalf("LoadCargoManifest() error: %v", err)
 	}
 	if got.IsParsed || got.EcosystemName != "rust" || got.ParseSkipReason == "" {
 		t.Fatalf("unexpected detect-only result: %+v", got)
@@ -169,11 +239,11 @@ func TestLoadPyprojectManifestDetectOnly(t *testing.T) {
 
 	root := t.TempDir()
 	path := filepath.Join(root, "pyproject.toml")
-	writeFile(t, path, "[project]\nname = \"demo\"\n")
+	testutil.WriteFile(t, path, "[project]\nname = \"demo\"\n")
 
-	got, err := loadPyprojectManifest(root, path)
+	got, err := LoadPyprojectManifest(root, path)
 	if err != nil {
-		t.Fatalf("loadPyprojectManifest() error: %v", err)
+		t.Fatalf("LoadPyprojectManifest() error: %v", err)
 	}
 	if got.IsParsed || got.EcosystemName != "python" {
 		t.Fatalf("unexpected detect-only result: %+v", got)

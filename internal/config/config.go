@@ -11,6 +11,7 @@ type AppConfig struct {
 	Verbose     bool
 	ShowVersion bool
 	ShowHelp    bool
+	DirectOut   bool
 	Args        []string
 }
 
@@ -59,6 +60,7 @@ func ParseConfig(
 
 	rootCmd.PersistentFlags().BoolVarP(&appConfig.Verbose, "verbose", "b", appConfig.Verbose, "enable verbose mode (VERBOSE)")
 	rootCmd.Flags().BoolVarP(&appConfig.ShowVersion, "version", "v", appConfig.ShowVersion, "prints version")
+	rootCmd.Flags().BoolVar(&appConfig.DirectOut, "out", appConfig.DirectOut, "print explore JSON to stdout and exit")
 
 	loadEnvVars(appConfig)
 

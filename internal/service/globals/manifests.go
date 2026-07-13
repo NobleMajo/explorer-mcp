@@ -1,4 +1,4 @@
-package service
+package globals
 
 import (
 	"bufio"
@@ -9,27 +9,27 @@ import (
 	"strings"
 )
 
-func loadGoModManifest(root, manifestPath string) (ecosystemResult, error) {
+func LoadGoModManifest(root, manifestPath string) (EcosystemResult, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return ecosystemResult{}, err
+		return EcosystemResult{}, err
 	}
 
 	deps := parseGoModRequire(string(data))
-	return ecosystemResult{
-		EcosystemName:        "go",
-		ManifestFilePath:     "go.mod",
-		ManifestFileExists:   true,
-		IsParsed:             true,
-		DependencyCount:      len(deps),
-		Dependencies:         deps,
+	return EcosystemResult{
+		EcosystemName:      "go",
+		ManifestFilePath:   "go.mod",
+		ManifestFileExists: true,
+		IsParsed:           true,
+		DependencyCount:    len(deps),
+		Dependencies:       deps,
 	}, nil
 }
 
-func loadPackageJsonManifest(root, manifestPath string) (ecosystemResult, error) {
+func LoadPackageJsonManifest(root, manifestPath string) (EcosystemResult, error) {
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return ecosystemResult{}, err
+		return EcosystemResult{}, err
 	}
 
 	var pkg struct {
@@ -37,24 +37,24 @@ func loadPackageJsonManifest(root, manifestPath string) (ecosystemResult, error)
 		DevDependencies map[string]string `json:"devDependencies"`
 	}
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return ecosystemResult{}, err
+		return EcosystemResult{}, err
 	}
 
-	groups := make([]dependencyGroup, 0, 2)
+	groups := make([]DependencyGroup, 0, 2)
 	if len(pkg.Dependencies) > 0 {
-		groups = append(groups, dependencyGroup{
+		groups = append(groups, DependencyGroup{
 			GroupName:    "dependencies",
 			PackageNames: sortedManifestKeys(pkg.Dependencies),
 		})
 	}
 	if len(pkg.DevDependencies) > 0 {
-		groups = append(groups, dependencyGroup{
+		groups = append(groups, DependencyGroup{
 			GroupName:    "devDependencies",
 			PackageNames: sortedManifestKeys(pkg.DevDependencies),
 		})
 	}
 
-	return ecosystemResult{
+	return EcosystemResult{
 		EcosystemName:      "node",
 		ManifestFilePath:   "package.json",
 		ManifestFileExists: true,
@@ -63,10 +63,10 @@ func loadPackageJsonManifest(root, manifestPath string) (ecosystemResult, error)
 	}, nil
 }
 
-func loadRequirementsManifest(root, manifestPath string) (ecosystemResult, error) {
+func LoadRequirementsManifest(root, manifestPath string) (EcosystemResult, error) {
 	file, err := os.Open(manifestPath)
 	if err != nil {
-		return ecosystemResult{}, err
+		return EcosystemResult{}, err
 	}
 	defer file.Close()
 
@@ -92,33 +92,33 @@ func loadRequirementsManifest(root, manifestPath string) (ecosystemResult, error
 		names = append(names, name)
 	}
 	if err := scanner.Err(); err != nil {
-		return ecosystemResult{}, err
+		return EcosystemResult{}, err
 	}
 
 	sort.Strings(names)
 
-	return ecosystemResult{
+	return EcosystemResult{
 		EcosystemName:      "python",
 		ManifestFilePath:   "requirements.txt",
 		ManifestFileExists: true,
 		IsParsed:           true,
-		DependencyGroups: []dependencyGroup{{
+		DependencyGroups: []DependencyGroup{{
 			GroupName:    "requirements",
 			PackageNames: names,
 		}},
 	}, nil
 }
 
-func loadCargoManifest(root, manifestPath string) (ecosystemResult, error) {
+func LoadCargoManifest(root, manifestPath string) (EcosystemResult, error) {
 	return detectOnlyManifestResult(manifestPath, "full TOML parsing not in v1")
 }
 
-func loadPyprojectManifest(root, manifestPath string) (ecosystemResult, error) {
+func LoadPyprojectManifest(root, manifestPath string) (EcosystemResult, error) {
 	return detectOnlyManifestResult(manifestPath, "full TOML parsing not in v1")
 }
 
-func detectOnlyManifestResult(manifestPath, reason string) (ecosystemResult, error) {
-	return ecosystemResult{
+func detectOnlyManifestResult(manifestPath, reason string) (EcosystemResult, error) {
+	return EcosystemResult{
 		EcosystemName:      ecosystemNameForManifest(manifestPath),
 		ManifestFilePath:   filepath.Base(manifestPath),
 		ManifestFileExists: true,
@@ -142,10 +142,10 @@ func ecosystemNameForManifest(manifestPath string) string {
 	}
 }
 
-func parseGoModRequire(content string) []goDependency {
+func parseGoModRequire(content string) []GoDependency {
 	lines := strings.Split(content, "\n")
 	inBlock := false
-	deps := make([]goDependency, 0)
+	deps := make([]GoDependency, 0)
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
@@ -183,15 +183,15 @@ func parseGoModRequire(content string) []goDependency {
 	return deps
 }
 
-func parseGoModRequireLine(line string) (goDependency, bool) {
+func parseGoModRequireLine(line string) (GoDependency, bool) {
 	isIndirect := strings.Contains(line, "// indirect")
 	line = strings.Split(line, "//")[0]
 	fields := strings.Fields(strings.TrimSpace(line))
 	if len(fields) < 2 {
-		return goDependency{}, false
+		return GoDependency{}, false
 	}
 
-	return goDependency{
+	return GoDependency{
 		PackageName: fields[0],
 		Version:     fields[1],
 		IsIndirect:  isIndirect,

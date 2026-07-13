@@ -4,11 +4,15 @@ import (
 	"context"
 
 	"github.com/NobleMajo/explorer-mcp/internal/config"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 func InitMcpService(cfg *config.AppConfig, name, version string) error {
-	server := mcp.NewServer(&mcp.Implementation{Name: name, Version: version}, nil)
+	server := mcpsdk.NewServer(&mcpsdk.Implementation{Name: name, Version: version}, nil)
 	registerRoutes(server, cfg)
-	return server.Run(context.Background(), &mcp.StdioTransport{})
+	return server.Run(context.Background(), &mcpsdk.StdioTransport{})
+}
+
+func DirectJsonResult(verbose bool) (string, error) {
+	return buildExploreResponse(verbose)
 }

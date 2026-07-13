@@ -1,4 +1,4 @@
-package service
+package globals
 
 import "testing"
 
@@ -19,8 +19,8 @@ func TestIsScanIgnored(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isScanIgnored(tc.input); got != tc.expected {
-				t.Fatalf("isScanIgnored(%q) = %v, want %v", tc.input, got, tc.expected)
+			if got := IsScanIgnored(tc.input); got != tc.expected {
+				t.Fatalf("IsScanIgnored(%q) = %v, want %v", tc.input, got, tc.expected)
 			}
 		})
 	}
@@ -42,8 +42,8 @@ func TestIsIgnoredFile(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isIgnoredFile(tc.input); got != tc.expected {
-				t.Fatalf("isIgnoredFile(%q) = %v, want %v", tc.input, got, tc.expected)
+			if got := IsIgnoredFile(tc.input); got != tc.expected {
+				t.Fatalf("IsIgnoredFile(%q) = %v, want %v", tc.input, got, tc.expected)
 			}
 		})
 	}

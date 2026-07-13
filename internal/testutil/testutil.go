@@ -1,4 +1,4 @@
-package service
+package testutil
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func chdir(t *testing.T, dir string) {
+func Chdir(t *testing.T, dir string) {
 	t.Helper()
 
 	old, err := os.Getwd()
@@ -22,7 +22,7 @@ func chdir(t *testing.T, dir string) {
 	}
 }
 
-func writeFile(t *testing.T, path, content string) {
+func WriteFile(t *testing.T, path, content string) {
 	t.Helper()
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -33,7 +33,7 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-func parseJSONResponse(t *testing.T, jsonText string, dest any) {
+func ParseJSON(t *testing.T, jsonText string, dest any) {
 	t.Helper()
 
 	if err := json.Unmarshal([]byte(jsonText), dest); err != nil {

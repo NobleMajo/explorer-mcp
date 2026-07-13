@@ -1,9 +1,11 @@
-package service
+package parent
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
 func TestHasGitMetadata(t *testing.T) {
@@ -36,7 +38,7 @@ func TestListSiblingProjects(t *testing.T) {
 	if err := os.Mkdir(filepath.Join(sibling, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(parent, "notes.txt"), "ignore me\n")
+	testutil.WriteFile(t, filepath.Join(parent, "notes.txt"), "ignore me\n")
 
 	got, err := listSiblingProjects(parent, current)
 	if err != nil {
@@ -66,18 +68,24 @@ func TestListSiblingProjects(t *testing.T) {
 func TestWorkspaceContext(t *testing.T) {
 	parent := t.TempDir()
 	current := filepath.Join(parent, "app")
+	sibling := filepath.Join(parent, "other")
 	if err := os.Mkdir(current, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	chdir(t, current)
+	if err := os.Mkdir(sibling, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.Chdir(t, current)
 
-	jsonText, err := WorkspaceContext()
+	result, err := ParentOverview()(false)
 	if err != nil {
-		t.Fatalf("WorkspaceContext() error: %v", err)
+		t.Fatalf("ParentOverview() error: %v", err)
 	}
 
-	var resp workspaceContextResponse
-	parseJSONResponse(t, jsonText, &resp)
+	resp, ok := result.(workspaceContextResponse)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
 
 	if resp.ToolName != "workspace_context" {
 		t.Fatalf("toolName = %q", resp.ToolName)
@@ -85,8 +93,26 @@ func TestWorkspaceContext(t *testing.T) {
 	if resp.CurrentWorkingDirectoryPath != current || resp.ParentDirectoryPath != parent {
 		t.Fatalf("unexpected paths: cwd=%q parent=%q", resp.CurrentWorkingDirectoryPath, resp.ParentDirectoryPath)
 	}
-	if resp.SiblingProjectCount != 1 || len(resp.SiblingProjects) != 1 {
+	if resp.SiblingProjectCount != 2 || len(resp.SiblingProjects) != 2 {
 		t.Fatalf("unexpected siblings: %+v", resp.SiblingProjects)
+	}
+}
+
+func TestWorkspaceContextUnreadableParent(t *testing.T) {
+	parent := t.TempDir()
+	current := filepath.Join(parent, "app")
+	if err := os.Mkdir(current, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.Chdir(t, current)
+	if err := os.Chmod(parent, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) })
+
+	_, err := ParentOverview()(false)
+	if err == nil {
+		t.Fatal("expected error when parent directory is unreadable")
 	}
 }
 

@@ -1,13 +1,15 @@
-package service
+package parent
 
 import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 )
 
 type workspaceContextResponse struct {
-	responseMeta
+	jsonresp.Meta
 	CurrentWorkingDirectoryPath string           `json:"currentWorkingDirectoryPath"`
 	ParentDirectoryPath         string           `json:"parentDirectoryPath"`
 	SiblingProjectCount         int              `json:"siblingProjectCount"`
@@ -21,28 +23,29 @@ type siblingProject struct {
 	IsGitRepo        bool   `json:"isGitRepo"`
 }
 
-func WorkspaceContext() (string, error) {
+func buildWorkspaceContext(verbose bool) (workspaceContextResponse, error) {
+	_ = verbose
 	cwd, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return workspaceContextResponse{}, err
 	}
 
 	parent := filepath.Dir(cwd)
 	siblings, err := listSiblingProjects(parent, cwd)
 	if err != nil {
-		return "", err
+		return workspaceContextResponse{}, err
 	}
 
-	return marshalResponse(workspaceContextResponse{
-		responseMeta: responseMeta{
+	return workspaceContextResponse{
+		Meta: jsonresp.Meta{
 			ToolName:      "workspace_context",
-			SchemaVersion: schemaVersion,
+			SchemaVersion: jsonresp.SchemaVersion,
 		},
 		CurrentWorkingDirectoryPath: cwd,
 		ParentDirectoryPath:         parent,
 		SiblingProjectCount:         len(siblings),
 		SiblingProjects:             siblings,
-	})
+	}, nil
 }
 
 func listSiblingProjects(parent, cwd string) ([]siblingProject, error) {

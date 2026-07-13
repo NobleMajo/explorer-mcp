@@ -1,13 +1,15 @@
-package service
+package git
 
 import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 )
 
 type gitOverviewResponse struct {
-	responseMeta
+	jsonresp.Meta
 	IsGitAvailable          bool             `json:"isGitAvailable"`
 	IsGitRepo               bool             `json:"isGitRepo"`
 	IsInsideWorkTree        bool             `json:"isInsideWorkTree"`
@@ -33,16 +35,17 @@ type gitCommit struct {
 	CommitSubject   string `json:"commitSubject"`
 }
 
-func GitOverview() (string, error) {
+func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
+	_ = verbose
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return gitOverviewResponse{}, err
 	}
 
 	resp := gitOverviewResponse{
-		responseMeta: responseMeta{
+		Meta: jsonresp.Meta{
 			ToolName:      "git_overview",
-			SchemaVersion: schemaVersion,
+			SchemaVersion: jsonresp.SchemaVersion,
 		},
 		ChangedFiles:  []gitChangedFile{},
 		RecentCommits: []gitCommit{},
@@ -51,13 +54,13 @@ func GitOverview() (string, error) {
 	if _, err := exec.LookPath("git"); err != nil {
 		resp.IsGitAvailable = false
 		resp.ErrorMessage = "git executable not found in PATH"
-		return marshalResponse(resp)
+		return resp, nil
 	}
 	resp.IsGitAvailable = true
 
 	inside, err := gitOutput(dir, "rev-parse", "--is-inside-work-tree")
 	if err != nil || inside != "true" {
-		return marshalResponse(resp)
+		return resp, nil
 	}
 
 	resp.IsGitRepo = true
@@ -81,7 +84,7 @@ func GitOverview() (string, error) {
 
 	resp.UnstagedDiffStatSummary, _ = gitOutput(dir, "diff", "--stat")
 
-	return marshalResponse(resp)
+	return resp, nil
 }
 
 func gitOutput(dir string, args ...string) (string, error) {
