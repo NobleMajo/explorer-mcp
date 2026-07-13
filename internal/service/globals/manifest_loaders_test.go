@@ -44,6 +44,14 @@ func TestManifestLoadersInvokeAll(t *testing.T) {
 		"pyproject.toml":   "[project]\nname = \"demo\"\n",
 	}
 
+	expectedTags := map[string]string{
+		"go.mod":           "@go",
+		"package.json":     "@npm",
+		"requirements.txt": "@pip",
+		"Cargo.toml":       "@cargo",
+		"pyproject.toml":   "@python",
+	}
+
 	expected := map[string][]string{
 		"go.mod":           {"github.com/foo/bar@v1.0.0 direct"},
 		"package.json":     {"left-pad@1.0.0 production"},
@@ -71,9 +79,15 @@ func TestManifestLoadersInvokeAll(t *testing.T) {
 			t.Fatalf("ManifestLoaders[%q] is nil", fileName)
 		}
 
-		got, err := loader(root, path)
+		tag, got, loaded, err := loader(root, path)
 		if err != nil {
 			t.Fatalf("ManifestLoaders[%q]() error: %v", fileName, err)
+		}
+		if !loaded {
+			t.Fatalf("ManifestLoaders[%q]() loaded = false, want true", fileName)
+		}
+		if tag != expectedTags[fileName] {
+			t.Fatalf("ManifestLoaders[%q]() tag = %q, want %q", fileName, tag, expectedTags[fileName])
 		}
 
 		want := expected[fileName]

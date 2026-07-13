@@ -3,24 +3,33 @@ package globals
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"os"
 	"sort"
 	"strings"
 )
 
-func LoadGoModManifest(root, manifestPath string) ([]string, error) {
+func LoadGoModManifest(root, manifestPath string) (string, []string, bool, error) {
+	_ = root
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
 	}
 
-	return parseGoModRequire(string(data)), nil
+	return ManifestLoaderTags["go.mod"], parseGoModRequire(string(data)), true, nil
 }
 
-func LoadPackageJsonManifest(root, manifestPath string) ([]string, error) {
+func LoadPackageJsonManifest(root, manifestPath string) (string, []string, bool, error) {
+	_ = root
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
 	}
 
 	var pkg struct {
@@ -28,7 +37,7 @@ func LoadPackageJsonManifest(root, manifestPath string) ([]string, error) {
 		DevDependencies map[string]string `json:"devDependencies"`
 	}
 	if err := json.Unmarshal(data, &pkg); err != nil {
-		return nil, err
+		return "", nil, false, err
 	}
 
 	entries := make([]string, 0, len(pkg.Dependencies)+len(pkg.DevDependencies))
@@ -40,13 +49,17 @@ func LoadPackageJsonManifest(root, manifestPath string) ([]string, error) {
 	}
 
 	sort.Strings(entries)
-	return entries, nil
+	return ManifestLoaderTags["package.json"], entries, true, nil
 }
 
-func LoadRequirementsManifest(root, manifestPath string) ([]string, error) {
+func LoadRequirementsManifest(root, manifestPath string) (string, []string, bool, error) {
+	_ = root
 	file, err := os.Open(manifestPath)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
 	}
 	defer file.Close()
 
@@ -66,27 +79,33 @@ func LoadRequirementsManifest(root, manifestPath string) ([]string, error) {
 		entries = append(entries, formatPythonDependency(line))
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return "", nil, false, err
 	}
 
 	sort.Strings(entries)
-	return entries, nil
+	return ManifestLoaderTags["requirements.txt"], entries, true, nil
 }
 
-func LoadCargoManifest(root, manifestPath string) ([]string, error) {
-	_, err := os.Stat(manifestPath)
-	if err != nil {
-		return nil, err
+func LoadCargoManifest(root, manifestPath string) (string, []string, bool, error) {
+	_ = root
+	if _, err := os.Stat(manifestPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
 	}
-	return nil, nil
+	return ManifestLoaderTags["Cargo.toml"], nil, true, nil
 }
 
-func LoadPyprojectManifest(root, manifestPath string) ([]string, error) {
-	_, err := os.Stat(manifestPath)
-	if err != nil {
-		return nil, err
+func LoadPyprojectManifest(root, manifestPath string) (string, []string, bool, error) {
+	_ = root
+	if _, err := os.Stat(manifestPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil, false, nil
+		}
+		return "", nil, false, err
 	}
-	return nil, nil
+	return ManifestLoaderTags["pyproject.toml"], nil, true, nil
 }
 
 func formatGoModuleDependency(name, version string, indirect bool) string {

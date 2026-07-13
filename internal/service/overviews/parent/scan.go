@@ -3,6 +3,7 @@ package parent
 import (
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
@@ -17,7 +18,7 @@ func listParentProjects(startDir string, maxDepth int) ([]string, error) {
 	cwd := filepath.Clean(startDir)
 	seen := make(map[string]struct{})
 
-	err := scanParentRepositories(cwd, maxDepth, func(absPath string) {
+	err := scanParentRepositories(cwd, maxDepth, func(absPath string, subfiles, subdirs []string) {
 		rel, relErr := filepath.Rel(cwd, absPath)
 		if relErr != nil {
 			return
@@ -32,7 +33,7 @@ func listParentProjects(startDir string, maxDepth int) ([]string, error) {
 		}
 		seen[rel] = struct{}{}
 
-		siblings = append(siblings, formatSiblingProject(absPath, rel))
+		siblings = append(siblings, formatSiblingProject(absPath, rel, subfiles, subdirs))
 	})
 	if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func listParentProjects(startDir string, maxDepth int) ([]string, error) {
 	return siblings, nil
 }
 
-func scanParentRepositories(startDir string, maxDepth int, callback func(path string)) error {
+func scanParentRepositories(startDir string, maxDepth int, callback func(path string, subfiles, subdirs []string)) error {
 	current := filepath.Clean(startDir)
 	previous := ""
 
@@ -63,7 +64,7 @@ func scanParentRepositories(startDir string, maxDepth int, callback func(path st
 	return nil
 }
 
-func scanDownwards(currentDir, skipDir string, maxDepth, currentDepth int, callback func(path string)) error {
+func scanDownwards(currentDir, skipDir string, maxDepth, currentDepth int, callback func(path string, subfiles, subdirs []string)) error {
 	if currentDepth > maxDepth {
 		return nil
 	}
@@ -87,7 +88,17 @@ func scanDownwards(currentDir, skipDir string, maxDepth, currentDepth int, callb
 			continue
 		}
 
-		callback(path)
+		childEntries, err := os.ReadDir(path)
+		if err != nil {
+			continue
+		}
+		subfiles, subdirs := dirListingNames(childEntries)
+
+		callback(path, subfiles, subdirs)
+
+		if hasSiblingProjectFlags(path, subfiles, subdirs) {
+			continue
+		}
 
 		if err := scanDownwards(path, "", maxDepth, currentDepth+1, callback); err != nil {
 			return err
@@ -95,6 +106,21 @@ func scanDownwards(currentDir, skipDir string, maxDepth, currentDepth int, callb
 	}
 
 	return nil
+}
+
+func dirListingNames(entries []os.DirEntry) (subfiles, subdirs []string) {
+	subfiles = make([]string, 0)
+	subdirs = make([]string, 0)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			subdirs = append(subdirs, entry.Name())
+			continue
+		}
+		subfiles = append(subfiles, entry.Name())
+	}
+	sort.Strings(subfiles)
+	sort.Strings(subdirs)
+	return subfiles, subdirs
 }
 
 func hasNamedPathSegment(rel string) bool {
