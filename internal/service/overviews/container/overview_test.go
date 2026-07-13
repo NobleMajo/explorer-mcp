@@ -91,7 +91,7 @@ func TestContainerOverviewIntegration(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("PATH", binDir)
 
 	result, err := ContainerOverview()(false)
 	if err != nil {
