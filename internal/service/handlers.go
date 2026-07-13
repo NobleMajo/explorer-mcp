@@ -41,7 +41,7 @@ func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	})
 }
 
-var AgentBehaviorMainInstruction = "You must strictly adhere to the specific behavior guidelines below whenever their corresponding metadata keys are present in the explorer payload. Always call this MCP endpoint when preparing the next development step, or whenever the project state, files, or execution context could have changed."
+var AgentBehaviorMainInstruction = "You must strictly follow the specific behavior guidelines below. Always call this MCP endpoint when preparing the next development step, or whenever the project state, files, or execution context could have changed."
 var AgentBehaviorInstructions = map[string]string{
 	"container": "Do not restart or stop discovered containers if they mount local source code and use auto-restart policies. Analyze container execution via runtime logs, local configurations, and container metadata. Actively scan for: compose.yml, compose.yaml, docker-compose.yml, docker-compose.yaml, Dockerfile, *.dockerfile, the ./docker directory, and related runtime assets.",
 	"deps":      "Minimize dependencies. Avoid adding unused or redundant packages. Focus strictly on the target requirement and prefer native standard libraries where applicable. Locate dependency source code paths and verify if a specialized docs-mcp exists to analyze and predict external package behavior before making structural modifications.",
@@ -135,7 +135,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		CLI:         sections.cli,
 	}
 
-	if !settings.disableBehaviorInstruction {
+	if settings.enableBehaviorInstruction {
 		response.AgentBehaviorMainInstruction = AgentBehaviorMainInstruction
 		response.AgentBehaviorInstructions = buildAgentBehaviorInstructions(sections)
 	}

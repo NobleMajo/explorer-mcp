@@ -47,7 +47,6 @@ func TestParseConfigPrintExploreFlags(t *testing.T) {
 		"-c", "0",
 		"-p", "1",
 		"-d", "2",
-		"-N",
 	}
 	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
 
@@ -63,8 +62,20 @@ func TestParseConfigPrintExploreFlags(t *testing.T) {
 	if cfg.RepoScanDepth != 2 {
 		t.Fatalf("RepoScanDepth = %d, want 2", cfg.RepoScanDepth)
 	}
-	if !cfg.DisableBehaviorInstruction {
-		t.Fatal("expected DisableBehaviorInstruction true")
+	if cfg.EnableBehaviorInstruction {
+		t.Fatal("expected EnableBehaviorInstruction false by default")
+	}
+}
+
+func TestParseConfigEnableBehaviorInstructionFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-B"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableBehaviorInstruction {
+		t.Fatal("expected EnableBehaviorInstruction true")
 	}
 }
 
@@ -129,16 +140,16 @@ func TestParseConfigEnableCliOverviewEnv(t *testing.T) {
 	}
 }
 
-func TestParseConfigDisableBehaviorInstructionEnv(t *testing.T) {
+func TestParseConfigEnableBehaviorInstructionEnv(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
 
-	t.Setenv("DISABLE_BEHAVIOR_INSTRUCTION", "true")
+	t.Setenv("ENABLE_BEHAVIOR_INSTRUCTION", "true")
 	os.Args = []string{"explorer-mcp", "print"}
 	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
 
-	if !cfg.DisableBehaviorInstruction {
-		t.Fatal("expected DISABLE_BEHAVIOR_INSTRUCTION env to disable behavior")
+	if !cfg.EnableBehaviorInstruction {
+		t.Fatal("expected ENABLE_BEHAVIOR_INSTRUCTION env to enable behavior")
 	}
 }
 

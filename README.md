@@ -29,7 +29,7 @@ The `explore` JSON follows a few consistent rules:
 - **Do not show what is not found** — whole sections are omitted when disabled by flag or when prerequisites are missing (e.g. no `git` binary, not a git repo, no container CLI).
 - **Combine details into string arrays** — dependencies, container rows, git status lines, and sibling paths are compact encoded strings instead of nested objects.
 - **Use small flags for metadata** — booleans like `parentScanPerformed`, `recentCommitsListed`, and `repoScanDepthLimit` tell the agent whether a scan ran vs. what was found.
-- **Behavior hints follow data** — `agentBehaviorInstructions` only includes domains whose section is present and non-empty; use `-N` / `--disable-behavior` to omit all behavior text.
+- **Behavior hints follow data** — `agentBehaviorInstructions` only includes domains whose section is present and non-empty; use `-B` / `--enable-behavior` to include behavior text.
 - **At least one overview required** — if every overview is disabled, `print` and `explore` return an error.
 
 Depth/count flags (`-c`, `-p`, `-d`) control how much is collected; disable flags (`-S`, `-G`, …) skip entire sections.

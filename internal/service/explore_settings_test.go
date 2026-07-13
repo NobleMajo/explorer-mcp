@@ -76,7 +76,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		ParentScanDotDirs:           true,
 		ParentScanHomeDir:           true,
 		RepoScanDepth:               3,
-		DisableBehaviorInstruction:  true,
+		EnableBehaviorInstruction:   true,
 		DisableStructureOverview:    true,
 		DisableGitOverview:          true,
 		DisableWorkspaceOverview:    true,
@@ -93,7 +93,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.parentScanDotDirs != cfg.ParentScanDotDirs ||
 		settings.parentScanHomeDir != cfg.ParentScanHomeDir ||
 		settings.repoScanDepth != cfg.RepoScanDepth ||
-		settings.disableBehaviorInstruction != cfg.DisableBehaviorInstruction ||
+		settings.enableBehaviorInstruction != cfg.EnableBehaviorInstruction ||
 		settings.disableStructureOverview != cfg.DisableStructureOverview ||
 		settings.disableGitOverview != cfg.DisableGitOverview ||
 		settings.disableWorkspaceOverview != cfg.DisableWorkspaceOverview ||

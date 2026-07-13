@@ -802,7 +802,8 @@ func TestBuildExploreResponseSkipsBehaviorHintsForUnavailableSections(t *testing
 	t.Setenv("PATH", t.TempDir())
 
 	jsonText, err := buildExploreResponse(exploreSettings{
-		repoScanDepth: 6,
+		repoScanDepth:             6,
+		enableBehaviorInstruction: true,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -929,7 +930,6 @@ func TestBuildExploreResponseOnlyCliEnabled(t *testing.T) {
 		disableContainerOverview:    true,
 		disableToolsOverview:        true,
 		enableCliOverview:           true,
-		disableBehaviorInstruction:  true,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -974,16 +974,15 @@ func TestBuildExploreResponseDisableStructureOverview(t *testing.T) {
 	}
 }
 
-func TestBuildExploreResponseDisableBehaviorInstruction(t *testing.T) {
+func TestBuildExploreResponseBehaviorDisabledByDefault(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
 
 	jsonText, err := buildExploreResponse(exploreSettings{
-		recentCommitCount:          0,
-		parentScanDepth:            0,
-		repoScanDepth:              0,
-		disableBehaviorInstruction: true,
+		recentCommitCount: 0,
+		parentScanDepth:   0,
+		repoScanDepth:     0,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -1042,10 +1041,11 @@ func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
 
 func testExploreSettingsAllSections(verbose bool) exploreSettings {
 	return exploreSettings{
-		verbose:           verbose,
-		recentCommitCount: 10,
-		parentScanDepth:   3,
-		repoScanDepth:     7,
-		enableCliOverview: true,
+		verbose:                     verbose,
+		recentCommitCount:           10,
+		parentScanDepth:             3,
+		repoScanDepth:               7,
+		enableCliOverview:           true,
+		enableBehaviorInstruction:   true,
 	}
 }

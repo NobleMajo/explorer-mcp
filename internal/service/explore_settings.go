@@ -16,7 +16,7 @@ type exploreSettings struct {
 	parentScanDotDirs           bool
 	parentScanHomeDir           bool
 	repoScanDepth               int
-	disableBehaviorInstruction  bool
+	enableBehaviorInstruction   bool
 	disableStructureOverview    bool
 	disableGitOverview          bool
 	disableWorkspaceOverview    bool
@@ -38,7 +38,7 @@ func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
 		parentScanDotDirs:           cfg.ParentScanDotDirs,
 		parentScanHomeDir:           cfg.ParentScanHomeDir,
 		repoScanDepth:               cfg.RepoScanDepth,
-		disableBehaviorInstruction:  cfg.DisableBehaviorInstruction,
+		enableBehaviorInstruction:   cfg.EnableBehaviorInstruction,
 		disableStructureOverview:    cfg.DisableStructureOverview,
 		disableGitOverview:          cfg.DisableGitOverview,
 		disableWorkspaceOverview:    cfg.DisableWorkspaceOverview,
