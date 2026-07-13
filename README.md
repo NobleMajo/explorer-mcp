@@ -7,8 +7,11 @@
 ![](https://img.shields.io/badge/dynamic/json?color=navy&label=forks&query=forks&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2Fnoblemajo%2Fexplorer-mcp)
 
 explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
- 
+
+Use `explorer-mcp print` to dump the same JSON the MCP `explore` tool returns.
+
 # Table of Contents
+- [Explore response design](#explore-response-design)
 - [Requirements](#requirements)
 - [Getting Started](#getting-started-1)
 - [Install via go](#install-via-go)
@@ -16,6 +19,31 @@ explorer-mcp is a lightweight, read-only MCP server that gives AI quick access t
 - [Build requirements](#build-requirements)
 - [Build](#build-1)
 - [Install go](#install-go)
+
+
+## Explore response design
+
+The `explore` JSON follows a few consistent rules:
+
+- **Only show what is there** — lists and maps use `omitempty`; empty arrays are omitted when a scan ran but found nothing.
+- **Do not show what is not found** — whole sections are omitted when disabled by flag or when prerequisites are missing (e.g. no `git` binary, not a git repo, no container CLI).
+- **Combine details into string arrays** — dependencies, container rows, git status lines, and sibling paths are compact encoded strings instead of nested objects.
+- **Use small flags for metadata** — booleans like `parentScanPerformed`, `recentCommitsListed`, and `repoScanDepthLimit` tell the agent whether a scan ran vs. what was found.
+- **Behavior hints follow data** — `agentBehaviorInstructions` only includes domains whose section is present and non-empty; use `-N` / `--disable-behavior` to omit all behavior text.
+- **At least one overview required** — if every overview is disabled, `print` and `explore` return an error.
+
+Depth/count flags (`-c`, `-p`, `-d`) control how much is collected; disable flags (`-S`, `-G`, …) skip entire sections.
+
+More flags via:
+```sh
+go run github.com/NobleMajo/explorer-mcp@latest -h
+```
+
+Example output for current working dir:
+```sh
+go run github.com/NobleMajo/explorer-mcp@latest print
+```
+
 
 # Getting Started
 
