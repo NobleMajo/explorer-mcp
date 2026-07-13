@@ -10,6 +10,7 @@ explorer-mcp is a lightweight, read-only MCP server that gives AI quick access t
  
 # Table of Contents
 - [Requirements](#requirements)
+- [Getting Started](#getting-started-1)
 - [Install via go](#install-via-go)
 - [Install via wget](#install-via-wget)
 - [Build requirements](#build-requirements)
@@ -19,7 +20,14 @@ explorer-mcp is a lightweight, read-only MCP server that gives AI quick access t
 # Getting Started
 
 ## Requirements
-None windows system with `go` or `wget & tar` installed.
+Linux- or macos-like systems with `go` or `wget & tar` installed.
+
+## Getting Started
+
+Start the latest repo version directly without leaving stuff in the current working dir: 
+```sh
+go run github.com/NobleMajo/explorer-mcp@latest
+```
 
 ## Install via go
 ###### *For this section go is required, check out the [install go guide](#install-go).*
