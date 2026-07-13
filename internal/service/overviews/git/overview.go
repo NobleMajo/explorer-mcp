@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -18,8 +19,8 @@ type gitOverviewResponse struct {
 	ChangedFileCount        int      `json:"changedFileCount"`
 	ChangedFiles            []string `json:"changedFiles"`
 	RecentCommitsListed     bool     `json:"recentCommitsListed"`
-	RecentCommitCount       *int     `json:"recentCommitCount,omitempty"`
-	RecentCommits           []string `json:"recentCommits,omitempty"`
+	CommitCount             *int     `json:"commitCount,omitempty"`
+	SomeRecentCommits       []string `json:"someRecentCommits,omitempty"`
 	UnstagedDiffStatSummary []string `json:"unstagedDiffStatSummary"`
 	ErrorMessage            string   `json:"errorMessage,omitempty"`
 }
@@ -52,6 +53,10 @@ func buildGitOverview(verbose bool, recentCommitCount int) (gitOverviewResponse,
 	resp.IsGitRepo = true
 	resp.IsInsideWorkTree = true
 
+	if count, ok := gitHistoryCommitCount(dir); ok {
+		resp.CommitCount = &count
+	}
+
 	branch, _ := gitOutput(dir, "branch", "--show-current")
 	resp.CurrentBranchName = branch
 	if branch == "" {
@@ -67,10 +72,8 @@ func buildGitOverview(verbose bool, recentCommitCount int) (gitOverviewResponse,
 	if recentCommitCount > 0 {
 		logOut, _ := gitOutput(dir, "log", fmt.Sprintf("-%d", recentCommitCount), "--format=%h %s")
 		commits := parseGitLog(logOut)
-		count := len(commits)
-		resp.RecentCommitCount = &count
 		if len(commits) > 0 {
-			resp.RecentCommits = commits
+			resp.SomeRecentCommits = commits
 		}
 	}
 
@@ -88,6 +91,19 @@ func gitOutput(dir string, args ...string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func gitHistoryCommitCount(dir string) (int, bool) {
+	out, err := gitOutput(dir, "rev-list", "--count", "HEAD")
+	if err != nil {
+		return 0, false
+	}
+
+	count, err := strconv.Atoi(strings.TrimSpace(out))
+	if err != nil {
+		return 0, false
+	}
+	return count, true
 }
 
 func parseGitStatusShort(output string) []string {

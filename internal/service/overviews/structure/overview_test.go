@@ -78,8 +78,8 @@ func TestRepoStructureDepthZero(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	if resp.RepoScanPerformed {
-		t.Fatal("expected repoScanPerformed false")
+	if resp.RepoScanDepthLimit == nil || *resp.RepoScanDepthLimit != 0 {
+		t.Fatalf("repoScanDepthLimit = %v, want 0", resp.RepoScanDepthLimit)
 	}
 	if resp.EntryCount != nil || len(resp.Entries) != 0 {
 		t.Fatalf("expected no entries, got %+v", resp)

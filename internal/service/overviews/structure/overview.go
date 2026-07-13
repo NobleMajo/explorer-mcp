@@ -9,7 +9,6 @@ import (
 )
 
 type repoStructureResponse struct {
-	RepoScanPerformed  bool     `json:"repoScanPerformed"`
 	RepoScanDepthLimit *int     `json:"repoScanDepthLimit,omitempty"`
 	EntryCount         *int     `json:"entryCount,omitempty"`
 	Entries            []string `json:"entries,omitempty"`
@@ -17,11 +16,9 @@ type repoStructureResponse struct {
 
 func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse, error) {
 	_ = verbose
-	resp := repoStructureResponse{
-		RepoScanPerformed: repoScanDepth > 0,
-	}
 	if repoScanDepth < 1 {
-		return resp, nil
+		zero := 0
+		return repoStructureResponse{RepoScanDepthLimit: &zero}, nil
 	}
 
 	root, err := os.Getwd()
@@ -35,8 +32,10 @@ func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse,
 	}
 
 	count := len(entries)
-	resp.RepoScanDepthLimit = &repoScanDepth
-	resp.EntryCount = &count
+	resp := repoStructureResponse{
+		RepoScanDepthLimit: &repoScanDepth,
+		EntryCount:         &count,
+	}
 	if len(entries) > 0 {
 		resp.Entries = entries
 	}

@@ -173,13 +173,13 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 	switch domainName {
 	case "structure":
 		var structure struct {
-			RepoScanPerformed bool `json:"repoScanPerformed"`
-			EntryCount        int  `json:"entryCount"`
+			RepoScanDepthLimit int `json:"repoScanDepthLimit"`
+			EntryCount         int `json:"entryCount"`
 		}
 		if json.Unmarshal(sections.repoStructure, &structure) != nil {
 			return false
 		}
-		if !structure.RepoScanPerformed {
+		if structure.RepoScanDepthLimit < 1 {
 			return false
 		}
 		return structure.EntryCount > 0

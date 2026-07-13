@@ -119,7 +119,7 @@ func TestGitOverviewWithoutGitRepo(t *testing.T) {
 	if resp.IsGitRepo {
 		t.Fatal("expected isGitRepo false outside git repo")
 	}
-	if len(resp.ChangedFiles) != 0 || len(resp.RecentCommits) != 0 {
+	if len(resp.ChangedFiles) != 0 || len(resp.SomeRecentCommits) != 0 {
 		t.Fatal("expected empty changed files and commits")
 	}
 }
@@ -193,8 +193,8 @@ func TestGitOverviewReportsRecentCommits(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.RecentCommitCount == nil || *resp.RecentCommitCount == 0 || len(resp.RecentCommits) == 0 {
-		t.Fatalf("expected recent commits, got %+v", resp)
+	if resp.CommitCount == nil || *resp.CommitCount != 1 || len(resp.SomeRecentCommits) == 0 {
+		t.Fatalf("expected recent commits and commitCount=1, got %+v", resp)
 	}
 	if !resp.RecentCommitsListed {
 		t.Fatal("expected recentCommitsListed true")
@@ -225,8 +225,11 @@ func TestGitOverviewSkipsRecentCommitsWhenZero(t *testing.T) {
 	if resp.RecentCommitsListed {
 		t.Fatal("expected recentCommitsListed false")
 	}
-	if resp.RecentCommitCount != nil || len(resp.RecentCommits) != 0 {
-		t.Fatalf("expected no recent commit fields, got %+v", resp)
+	if len(resp.SomeRecentCommits) != 0 {
+		t.Fatalf("expected no recent commits, got %+v", resp.SomeRecentCommits)
+	}
+	if resp.CommitCount == nil || *resp.CommitCount != 1 {
+		t.Fatalf("expected commitCount=1, got %+v", resp.CommitCount)
 	}
 }
 
@@ -261,6 +264,38 @@ func TestGitOverviewDirtyWorkingTree(t *testing.T) {
 	}
 }
 
+func TestGitOverviewCommitCountIsFullHistory(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+
+	runGit(t, root, "init")
+	runGit(t, root, "config", "user.email", "test@example.com")
+	runGit(t, root, "config", "user.name", "test")
+	testutil.WriteFile(t, root+"/README.md", "demo\n")
+	runGit(t, root, "add", "README.md")
+	runGit(t, root, "commit", "-m", "init")
+	testutil.WriteFile(t, root+"/README.md", "demo2\n")
+	runGit(t, root, "add", "README.md")
+	runGit(t, root, "commit", "-m", "second")
+
+	result, err := GitOverview(1)()(false)
+	if err != nil {
+		t.Fatalf("GitOverview() error: %v", err)
+	}
+
+	resp := result.(gitOverviewResponse)
+	if resp.CommitCount == nil || *resp.CommitCount != 2 {
+		t.Fatalf("commitCount = %v, want 2", resp.CommitCount)
+	}
+	if len(resp.SomeRecentCommits) != 1 {
+		t.Fatalf("someRecentCommits len = %d, want 1", len(resp.SomeRecentCommits))
+	}
+}
+
 func TestGitOverviewDetachedHead(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not in PATH")
@@ -289,6 +324,9 @@ func TestGitOverviewDetachedHead(t *testing.T) {
 
 	if !resp.IsDetachedHead || resp.DetachedHeadCommitHash == "" {
 		t.Fatalf("expected detached HEAD, got %+v", resp)
+	}
+	if resp.CommitCount == nil || *resp.CommitCount != 1 {
+		t.Fatalf("commitCount = %v, want 1", resp.CommitCount)
 	}
 }
 
