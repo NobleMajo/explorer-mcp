@@ -122,10 +122,14 @@ func ParseConfig(
 		Hidden: true,
 	})
 
-	err := rootCmd.Execute()
+	cmd, err := rootCmd.ExecuteC()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	if commandHelpRequested(cmd) {
+		os.Exit(0)
 	}
 
 	if appConfig.Verbose {
@@ -138,4 +142,13 @@ func ParseConfig(
 	}
 
 	return appConfig
+}
+
+func commandHelpRequested(cmd *cobra.Command) bool {
+	for c := cmd; c != nil; c = c.Parent() {
+		if helpFlag := c.Flags().Lookup("help"); helpFlag != nil && helpFlag.Changed {
+			return true
+		}
+	}
+	return false
 }

@@ -88,3 +88,33 @@ func TestParseConfigRejectsUnknownSubcommand(t *testing.T) {
 		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
 	}
 }
+
+func TestParseConfigPrintHelpExits(t *testing.T) {
+	if os.Getenv("TEST_PARSE_CONFIG_PRINT_HELP") == "1" {
+		os.Args = []string{"explorer-mcp", "print", "--help"}
+		ParseConfig("Demo", "demo", "1.0.0", "abc")
+		os.Exit(0)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestParseConfigPrintHelpExits$")
+	cmd.Env = append(os.Environ(), "TEST_PARSE_CONFIG_PRINT_HELP=1")
+	err := cmd.Run()
+	if err != nil {
+		t.Fatalf("expected exit 0, got %v", err)
+	}
+}
+
+func TestParseConfigRootHelpExits(t *testing.T) {
+	if os.Getenv("TEST_PARSE_CONFIG_ROOT_HELP") == "1" {
+		os.Args = []string{"explorer-mcp", "--help"}
+		ParseConfig("Demo", "demo", "1.0.0", "abc")
+		os.Exit(0)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestParseConfigRootHelpExits$")
+	cmd.Env = append(os.Environ(), "TEST_PARSE_CONFIG_ROOT_HELP=1")
+	err := cmd.Run()
+	if err != nil {
+		t.Fatalf("expected exit 0, got %v", err)
+	}
+}
