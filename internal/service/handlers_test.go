@@ -650,10 +650,100 @@ func assertSectionHasField(t *testing.T, field string, raw json.RawMessage, want
 	}
 }
 
-func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
+func TestBuildExploreResponseAllOverviewsDisabledReturnsError(t *testing.T) {
+	_, err := buildExploreResponse(exploreSettings{
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+		enableCliOverview:           false,
+	})
+	if !errors.Is(err, ErrAllOverviewsDisabled) {
+		t.Fatalf("buildExploreResponse() error = %v, want ErrAllOverviewsDisabled", err)
+	}
+}
+
+func TestBuildExploreResponseDisableBehaviorInstruction(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(exploreSettings{
+		recentCommitCount:          0,
+		parentScanDepth:            0,
+		repoScanDepth:              0,
+		disableBehaviorInstruction: true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp exploreResponse
+	testutil.ParseJSON(t, jsonText, &resp)
+
+	if resp.AgentBehaviorMainInstruction != "" {
+		t.Fatalf("agentBehaviorMainInstruction = %q, want empty", resp.AgentBehaviorMainInstruction)
+	}
+	if len(resp.AgentBehaviorInstructions) != 0 {
+		t.Fatalf("agentBehaviorInstructions = %v, want empty", resp.AgentBehaviorInstructions)
+	}
+}
+
+func TestBuildExploreResponseOmitsContainerWithoutCLI(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", t.TempDir())
+
+	jsonText, err := buildExploreResponse(testExploreSettings(false))
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["container"]; ok {
+		t.Fatal("expected container section omitted when no container CLI in PATH")
+	}
+}
+
+func TestBuildExploreResponseOmitsGitOutsideRepo(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(testExploreSettings(false))
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["git"]; ok {
+		t.Fatal("expected git section omitted outside git repo")
+	}
+}
+
+func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	initCmd := exec.Command("git", "init")
+	initCmd.Dir = root
+	if out, err := initCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
 
 	jsonText, err := buildExploreResponse(exploreSettings{
 		recentCommitCount: 0,
@@ -687,5 +777,6 @@ func testExploreSettings(verbose bool) exploreSettings {
 		recentCommitCount: 10,
 		parentScanDepth:   3,
 		repoScanDepth:     7,
+		enableCliOverview: true,
 	}
 }

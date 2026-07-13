@@ -14,12 +14,19 @@ type AppConfig struct {
 
 	PrintAll bool
 
-	RecentCommitCount         int
-	ParentScanDepth           int
-	ParentScanDotDirs         bool
-	ParentScanHomeDir         bool
-	RepoScanDepth             int
-	RemoveBehaviorInstruction bool
+	RecentCommitCount          int
+	ParentScanDepth            int
+	ParentScanDotDirs          bool
+	ParentScanHomeDir          bool
+	RepoScanDepth              int
+	DisableBehaviorInstruction bool
+	DisableStructureOverview   bool
+	DisableGitOverview           bool
+	DisableWorkspaceOverview     bool
+	DisableDependenciesOverview  bool
+	DisableContainerOverview     bool
+	DisableToolsOverview         bool
+	EnableCliOverview            bool
 }
 
 func defaultAppConfig() *AppConfig {
@@ -30,12 +37,19 @@ func defaultAppConfig() *AppConfig {
 
 		PrintAll: false,
 
-		RecentCommitCount:         12,
-		ParentScanDepth:           2,
-		ParentScanDotDirs:         false,
-		ParentScanHomeDir:         false,
-		RepoScanDepth:             6,
-		RemoveBehaviorInstruction: false,
+		RecentCommitCount:          12,
+		ParentScanDepth:            2,
+		ParentScanDotDirs:          false,
+		ParentScanHomeDir:          false,
+		RepoScanDepth:              6,
+		DisableBehaviorInstruction: false,
+		DisableStructureOverview:   false,
+		DisableGitOverview:         false,
+		DisableWorkspaceOverview:   false,
+		DisableDependenciesOverview: false,
+		DisableContainerOverview:   false,
+		DisableToolsOverview:       false,
+		EnableCliOverview:          false,
 	}
 }
 
@@ -85,8 +99,29 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsBool("PARENT_SCAN_HOME_DIR", func(value bool) {
 		appConfig.ParentScanHomeDir = value
 	})
-	EnvIsBool("REMOVE_BEHAVIOR_INSTRUCTION", func(value bool) {
-		appConfig.RemoveBehaviorInstruction = value
+	EnvIsBool("DISABLE_BEHAVIOR_INSTRUCTION", func(value bool) {
+		appConfig.DisableBehaviorInstruction = value
+	})
+	EnvIsBool("DISABLE_STRUCTURE_OVERVIEW", func(value bool) {
+		appConfig.DisableStructureOverview = value
+	})
+	EnvIsBool("DISABLE_GIT_OVERVIEW", func(value bool) {
+		appConfig.DisableGitOverview = value
+	})
+	EnvIsBool("DISABLE_WORKSPACE_OVERVIEW", func(value bool) {
+		appConfig.DisableWorkspaceOverview = value
+	})
+	EnvIsBool("DISABLE_DEPENDENCIES_OVERVIEW", func(value bool) {
+		appConfig.DisableDependenciesOverview = value
+	})
+	EnvIsBool("DISABLE_CONTAINER_OVERVIEW", func(value bool) {
+		appConfig.DisableContainerOverview = value
+	})
+	EnvIsBool("DISABLE_TOOLS_OVERVIEW", func(value bool) {
+		appConfig.DisableToolsOverview = value
+	})
+	EnvIsBool("ENABLE_CLI_OVERVIEW", func(value bool) {
+		appConfig.EnableCliOverview = value
 	})
 }
 
@@ -97,7 +132,14 @@ func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanDotDirs, "parent-scan-dot-dirs", "D", appConfig.ParentScanDotDirs, "include dot directories during parent scan (PARENT_SCAN_DOT_DIRS)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.ParentScanHomeDir, "parent-scan-home-dir", "H", appConfig.ParentScanHomeDir, "include home directory during parent scan (PARENT_SCAN_HOME_DIR)")
 	cmd.PersistentFlags().IntVarP(&appConfig.RepoScanDepth, "repo-scan-depth", "d", appConfig.RepoScanDepth, "repo structure scan depth (REPO_SCAN_DEPTH)")
-	cmd.PersistentFlags().BoolVarP(&appConfig.RemoveBehaviorInstruction, "no-behavior", "N", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableBehaviorInstruction, "disable-behavior", "N", appConfig.DisableBehaviorInstruction, "omit behavior instructions (DISABLE_BEHAVIOR_INSTRUCTION)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableStructureOverview, "disable-structure", "S", appConfig.DisableStructureOverview, "omit structure overview (DISABLE_STRUCTURE_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableGitOverview, "disable-git", "G", appConfig.DisableGitOverview, "omit git overview (DISABLE_GIT_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableWorkspaceOverview, "disable-workspace", "W", appConfig.DisableWorkspaceOverview, "omit workspace overview (DISABLE_WORKSPACE_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableDependenciesOverview, "disable-dependencies", "E", appConfig.DisableDependenciesOverview, "omit dependencies overview (DISABLE_DEPENDENCIES_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableContainerOverview, "disable-container", "C", appConfig.DisableContainerOverview, "omit container overview (DISABLE_CONTAINER_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.DisableToolsOverview, "disable-tools", "T", appConfig.DisableToolsOverview, "omit tools overview (DISABLE_TOOLS_OVERVIEW)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.EnableCliOverview, "enable-cli", "L", appConfig.EnableCliOverview, "include cli overview (ENABLE_CLI_OVERVIEW)")
 }
 
 func ParseConfig(

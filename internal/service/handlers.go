@@ -53,55 +53,59 @@ var AgentBehaviorInstructions = map[string]string{
 
 type exploreResponse struct {
 	responseMeta
-	ProjectRootPath     string            `json:"projectRootPath"`
-	Structure         json.RawMessage   `json:"structure"`
-	Git               json.RawMessage   `json:"git"`
-	Workspace         json.RawMessage   `json:"workspace"`
-	Dependencies      json.RawMessage   `json:"dependencies"`
-	Container         json.RawMessage   `json:"container"`
-	Tools             json.RawMessage   `json:"tools"`
-	CLI               json.RawMessage   `json:"cli"`
+	ProjectRootPath                string            `json:"projectRootPath"`
+	Structure                      json.RawMessage   `json:"structure,omitempty"`
+	Git                            json.RawMessage   `json:"git,omitempty"`
+	Workspace                      json.RawMessage   `json:"workspace,omitempty"`
+	Dependencies                   json.RawMessage   `json:"dependencies,omitempty"`
+	Container                      json.RawMessage   `json:"container,omitempty"`
+	Tools                          json.RawMessage   `json:"tools,omitempty"`
+	CLI                            json.RawMessage   `json:"cli,omitempty"`
 	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction,omitempty"`
 	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
 
 func buildExploreResponse(settings exploreSettings) (string, error) {
+	if !settings.hasEnabledOverview() {
+		return "", ErrAllOverviewsDisabled
+	}
+
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 
-	repoStructure, err := overviewSection(structure.StructureOverview(settings.repoScanDepth), settings.verbose)
+	repoStructure, err := optionalOverviewSection(settings.disableStructureOverview, structure.StructureOverview(settings.repoScanDepth), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	gitOverview, err := overviewSection(git.GitOverview(settings.recentCommitCount), settings.verbose)
+	gitOverview, err := optionalOverviewSection(settings.disableGitOverview, git.GitOverview(settings.recentCommitCount), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	workspaceContext, err := overviewSection(parent.ParentOverview(settings.parentScanSettings()), settings.verbose)
+	workspaceContext, err := optionalOverviewSection(settings.disableWorkspaceOverview, parent.ParentOverview(settings.parentScanSettings()), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	dependencies, err := overviewSection(deps.DepsOverview, settings.verbose)
+	dependencies, err := optionalOverviewSection(settings.disableDependenciesOverview, deps.DepsOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	containerOverview, err := overviewSection(container.ContainerOverview, settings.verbose)
+	containerOverview, err := optionalOverviewSection(settings.disableContainerOverview, container.ContainerOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	projectTools, err := overviewSection(tools.ToolsOverview, settings.verbose)
+	projectTools, err := optionalOverviewSection(settings.disableToolsOverview, tools.ToolsOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	cliOverview, err := overviewSection(cli.CLIOverview, settings.verbose)
+	cliOverview, err := optionalOverviewSection(!settings.enableCliOverview, cli.CLIOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
@@ -131,7 +135,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		CLI:         sections.cli,
 	}
 
-	if !settings.removeBehaviorInstruction {
+	if !settings.disableBehaviorInstruction {
 		response.AgentBehaviorMainInstruction = AgentBehaviorMainInstruction
 		response.AgentBehaviorInstructions = buildAgentBehaviorInstructions(sections)
 	}
@@ -270,10 +274,20 @@ func hasProjectToolsData(projectTools json.RawMessage) bool {
 	return false
 }
 
+func optionalOverviewSection(disabled bool, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
+	if disabled {
+		return nil, nil
+	}
+	return overviewSection(fn, verbose)
+}
+
 func overviewSection(fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
 	result, err := fn()(verbose)
 	if err != nil {
 		return nil, err
+	}
+	if result == nil {
+		return nil, nil
 	}
 	text, err := marshalResponse(result)
 	if err != nil {

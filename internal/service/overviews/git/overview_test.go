@@ -110,17 +110,8 @@ func TestGitOverviewWithoutGitRepo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
-
-	resp, ok := result.(gitOverviewResponse)
-	if !ok {
-		t.Fatalf("unexpected result type %T", result)
-	}
-
-	if resp.IsGitRepo {
-		t.Fatal("expected isGitRepo false outside git repo")
-	}
-	if len(resp.ChangedFiles) != 0 || len(resp.SomeRecentCommits) != 0 {
-		t.Fatal("expected empty changed files and commits")
+	if result != nil {
+		t.Fatalf("expected nil outside git repo, got %+v", result)
 	}
 }
 
@@ -133,13 +124,8 @@ func TestGitOverviewGitNotInPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
-
-	resp, ok := result.(gitOverviewResponse)
-	if !ok {
-		t.Fatalf("unexpected result type %T", result)
-	}
-	if resp.IsGitAvailable || resp.ErrorMessage == "" {
-		t.Fatalf("expected git unavailable response, got %+v", resp)
+	if result != nil {
+		t.Fatalf("expected nil when git not in PATH, got %+v", result)
 	}
 }
 

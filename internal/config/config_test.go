@@ -60,8 +60,56 @@ func TestParseConfigPrintExploreFlags(t *testing.T) {
 	if cfg.RepoScanDepth != 2 {
 		t.Fatalf("RepoScanDepth = %d, want 2", cfg.RepoScanDepth)
 	}
-	if !cfg.RemoveBehaviorInstruction {
-		t.Fatal("expected RemoveBehaviorInstruction true")
+	if !cfg.DisableBehaviorInstruction {
+		t.Fatal("expected DisableBehaviorInstruction true")
+	}
+}
+
+func TestParseConfigDisableOverviewFlags(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{
+		"explorer-mcp", "print",
+		"-S", "-G", "-W", "-E", "-C", "-T",
+	}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.PrintAll {
+		t.Fatal("expected PrintAll true")
+	}
+	if !cfg.DisableStructureOverview {
+		t.Fatal("expected DisableStructureOverview true")
+	}
+	if !cfg.DisableGitOverview {
+		t.Fatal("expected DisableGitOverview true")
+	}
+	if !cfg.DisableWorkspaceOverview {
+		t.Fatal("expected DisableWorkspaceOverview true")
+	}
+	if !cfg.DisableDependenciesOverview {
+		t.Fatal("expected DisableDependenciesOverview true")
+	}
+	if !cfg.DisableContainerOverview {
+		t.Fatal("expected DisableContainerOverview true")
+	}
+	if !cfg.DisableToolsOverview {
+		t.Fatal("expected DisableToolsOverview true")
+	}
+	if cfg.EnableCliOverview {
+		t.Fatal("expected EnableCliOverview false by default")
+	}
+}
+
+func TestParseConfigEnableCliOverviewFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-L"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableCliOverview {
+		t.Fatal("expected EnableCliOverview true")
 	}
 }
 

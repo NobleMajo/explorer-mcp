@@ -16,14 +16,18 @@ type containerOverviewResponse struct {
 	ContainerFound map[string][]string `json:"containerFound,omitempty"`
 }
 
-func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
+func buildContainerOverview(verbose bool) (any, error) {
 	_ = verbose
 	root, err := os.Getwd()
 	if err != nil {
-		return containerOverviewResponse{}, err
+		return nil, err
 	}
 
 	cliFound := detectAvailableContainerCLIs()
+	if len(cliFound) == 0 {
+		return nil, nil
+	}
+
 	containerFound := make(map[string][]string)
 
 	for _, runtimeName := range globals.KnownContainerRuntimeCLINames {

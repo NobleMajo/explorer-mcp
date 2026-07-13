@@ -25,33 +25,30 @@ type gitOverviewResponse struct {
 	ErrorMessage            string   `json:"errorMessage,omitempty"`
 }
 
-func buildGitOverview(verbose bool, recentCommitCount int) (gitOverviewResponse, error) {
+func buildGitOverview(verbose bool, recentCommitCount int) (any, error) {
 	_ = verbose
 	dir, err := os.Getwd()
 	if err != nil {
-		return gitOverviewResponse{}, err
-	}
-
-	resp := gitOverviewResponse{
-		ChangedFiles:            []string{},
-		UnstagedDiffStatSummary: []string{},
-		RecentCommitsListed:     recentCommitCount > 0,
+		return nil, err
 	}
 
 	if _, err := exec.LookPath("git"); err != nil {
-		resp.IsGitAvailable = false
-		resp.ErrorMessage = "git executable not found in PATH"
-		return resp, nil
+		return nil, nil
 	}
-	resp.IsGitAvailable = true
 
 	inside, err := gitOutput(dir, "rev-parse", "--is-inside-work-tree")
 	if err != nil || inside != "true" {
-		return resp, nil
+		return nil, nil
 	}
 
-	resp.IsGitRepo = true
-	resp.IsInsideWorkTree = true
+	resp := gitOverviewResponse{
+		IsGitAvailable:          true,
+		ChangedFiles:            []string{},
+		UnstagedDiffStatSummary: []string{},
+		RecentCommitsListed:     recentCommitCount > 0,
+		IsGitRepo:               true,
+		IsInsideWorkTree:        true,
+	}
 
 	if count, ok := gitHistoryCommitCount(dir); ok {
 		resp.CommitCount = &count

@@ -173,13 +173,8 @@ func TestContainerOverviewEmptyWhenNoCLIs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ContainerOverview() error: %v", err)
 	}
-
-	resp := result.(containerOverviewResponse)
-	if len(resp.CLIFound) != 0 {
-		t.Fatalf("cliFound = %v, want empty", resp.CLIFound)
-	}
-	if resp.ContainerFound != nil && len(resp.ContainerFound) != 0 {
-		t.Fatalf("containerFound = %v, want empty", resp.ContainerFound)
+	if result != nil {
+		t.Fatalf("expected nil when no container CLIs in PATH, got %+v", result)
 	}
 }
 
