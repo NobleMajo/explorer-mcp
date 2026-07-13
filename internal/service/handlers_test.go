@@ -364,7 +364,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools makefile",
 			domain: "tools",
 			sect: exploreSections{
-				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make-targets": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -372,7 +372,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools scripts",
 			domain: "tools",
 			sect: exploreSections{
-				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"package.json"}, "scriptsFound": map[string]any{"package": []string{"build"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"package.json"}, "scriptsFound": map[string]any{"package.json-scripts": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -420,7 +420,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools shell scripts",
 			domain: "tools",
 			sect: exploreSections{
-				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"*.sh"}, "scriptsFound": map[string]any{"shell": []string{"run.sh"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"*.sh"}, "scriptsFound": map[string]any{"bash-scripts": []string{"run.sh"}}}),
 			},
 			want: true,
 		},
@@ -481,8 +481,8 @@ func TestHasProjectToolsData(t *testing.T) {
 		{name: "invalid json", raw: json.RawMessage("{"), want: false},
 		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"toolsFound": []string{}, "scriptsFound": map[string]any{}}), want: false},
 		{name: "makefile", raw: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}}), want: true},
-		{name: "package json", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"package": []string{"build"}}}), want: true},
-		{name: "shell", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"shell": []string{"run.sh"}}}), want: true},
+		{name: "package json", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"package.json-scripts": []string{"build"}}}), want: true},
+		{name: "shell", raw: mustRawJSON(t, map[string]any{"scriptsFound": map[string]any{"bash-scripts": []string{"run.sh"}}}), want: true},
 	}
 
 	for _, tc := range tests {
@@ -505,7 +505,7 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
 		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
 		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
-		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
+		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make-targets": []string{"build"}}}),
 		cli:        mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
 		opencode:   mustRawJSON(t, map[string]any{"permissions": []string{"* '*':allow"}}),
 	}

@@ -13,6 +13,12 @@ import (
 
 var makefileTargetNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
+const (
+	scriptsKeyMakeTargets      = "make-targets"
+	scriptsKeyPackageJSON      = "package.json-scripts"
+	scriptsKeyBashScripts      = "bash-scripts"
+)
+
 type projectToolsResponse struct {
 	ToolsFound   []string            `json:"toolsFound,omitempty"`
 	ScriptsFound map[string][]string `json:"scriptsFound,omitempty"`
@@ -33,7 +39,7 @@ func buildProjectTools(projectRootPath string, verbose bool) (projectToolsRespon
 			return projectToolsResponse{}, err
 		}
 		if names := parseMakefileTargetNames(string(data)); len(names) > 0 {
-			scriptsFound["make"] = names
+			scriptsFound[scriptsKeyMakeTargets] = names
 		}
 	}
 
@@ -45,7 +51,7 @@ func buildProjectTools(projectRootPath string, verbose bool) (projectToolsRespon
 			return projectToolsResponse{}, err
 		}
 		if len(names) > 0 {
-			scriptsFound["package"] = names
+			scriptsFound[scriptsKeyPackageJSON] = names
 		}
 	}
 
@@ -55,7 +61,7 @@ func buildProjectTools(projectRootPath string, verbose bool) (projectToolsRespon
 	}
 	if len(shellScripts) > 0 {
 		toolsFound = append(toolsFound, "*.sh")
-		scriptsFound["shell"] = shellScripts
+		scriptsFound[scriptsKeyBashScripts] = shellScripts
 	}
 
 	sort.Strings(toolsFound)

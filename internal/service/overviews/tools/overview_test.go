@@ -158,7 +158,7 @@ func TestProjectToolsDetectsPackageJsonScripts(t *testing.T) {
 	if !reflect.DeepEqual(resp.ToolsFound, []string{"package.json"}) {
 		t.Fatalf("unexpected toolsFound: %+v", resp.ToolsFound)
 	}
-	if !reflect.DeepEqual(resp.ScriptsFound, map[string][]string{"package": {"build", "test"}}) {
+	if !reflect.DeepEqual(resp.ScriptsFound, map[string][]string{scriptsKeyPackageJSON: {"build", "test"}}) {
 		t.Fatalf("unexpected scriptsFound: %+v", resp.ScriptsFound)
 	}
 }
@@ -184,8 +184,8 @@ func TestProjectToolsDetectsMakefileTargets(t *testing.T) {
 		t.Fatalf("unexpected toolsFound: %+v", resp.ToolsFound)
 	}
 	if !reflect.DeepEqual(resp.ScriptsFound, map[string][]string{
-		"make":  {"build", "test"},
-		"shell": {"run.sh"},
+		scriptsKeyMakeTargets: {"build", "test"},
+		scriptsKeyBashScripts: {"run.sh"},
 	}) {
 		t.Fatalf("unexpected scriptsFound: %+v", resp.ScriptsFound)
 	}
