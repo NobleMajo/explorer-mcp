@@ -18,7 +18,6 @@ type AppConfig struct {
 	RecentCommitCount         int
 	ParentScanDepth           int
 	RepoScanDepth             int
-	ScanIgnoreFile            string
 	RemoveBehaviorInstruction bool
 }
 
@@ -31,10 +30,9 @@ func defaultAppConfig() *AppConfig {
 
 		PrintAll: false,
 
-		RecentCommitCount:         10,
-		ParentScanDepth:           3,
-		RepoScanDepth:             7,
-		ScanIgnoreFile:            ".gitignore",
+		RecentCommitCount:         12,
+		ParentScanDepth:           2,
+		RepoScanDepth:             6,
 		RemoveBehaviorInstruction: false,
 	}
 }
@@ -79,13 +77,16 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsInt("REPO_SCAN_DEPTH", func(value int) {
 		appConfig.RepoScanDepth = value
 	})
-	EnvIsString("SCAN_IGNORE_FILE", func(value string) {
-		appConfig.ScanIgnoreFile = value
-	})
-	EnvIsBool("ADD_BEHAVIOR_INSTRUCTION", func(value bool) {
+	EnvIsBool("REMOVE_BEHAVIOR_INSTRUCTION", func(value bool) {
 		appConfig.RemoveBehaviorInstruction = value
 	})
+}
 
+func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
+	cmd.PersistentFlags().IntVarP(&appConfig.RecentCommitCount, "recent-commit-count", "c", appConfig.RecentCommitCount, "number of recent git commits to include (RECENT_COMMIT_COUNT)")
+	cmd.PersistentFlags().IntVarP(&appConfig.ParentScanDepth, "parent-scan-depth", "p", appConfig.ParentScanDepth, "parent directory scan depth (PARENT_SCAN_DEPTH)")
+	cmd.PersistentFlags().IntVarP(&appConfig.RepoScanDepth, "repo-scan-depth", "d", appConfig.RepoScanDepth, "repo structure scan depth (REPO_SCAN_DEPTH)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.RemoveBehaviorInstruction, "no-behavior", "n", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
 }
 
 func ParseConfig(
@@ -106,12 +107,7 @@ func ParseConfig(
 	rootCmd.PersistentFlags().BoolVarP(&appConfig.Verbose, "verbose", "b", appConfig.Verbose, "enable verbose mode (VERBOSE)")
 	rootCmd.Flags().BoolVarP(&appConfig.ShowVersion, "version", "v", appConfig.ShowVersion, "prints version")
 
-	rootCmd.Flags().IntVarP(&appConfig.RecentCommitCount, "recent-commit-count", "c", appConfig.RecentCommitCount, "number of recent git commits to include (RECENT_COMMIT_COUNT)")
-	rootCmd.Flags().IntVarP(&appConfig.ParentScanDepth, "parent-scan-depth", "p", appConfig.ParentScanDepth, "parent directory scan depth (PARENT_SCAN_DEPTH)")
-	rootCmd.Flags().IntVarP(&appConfig.RepoScanDepth, "repo-scan-depth", "d", appConfig.RepoScanDepth, "repo structure scan depth (REPO_SCAN_DEPTH)")
-
-	rootCmd.Flags().StringVarP(&appConfig.ScanIgnoreFile, "ignore-file", "i", appConfig.ScanIgnoreFile, "overwrites default .gitignore file for scans")
-	rootCmd.Flags().BoolVarP(&appConfig.RemoveBehaviorInstruction, "no-behavior", "n", appConfig.RemoveBehaviorInstruction, "dont adds behavior instructions")
+	applyExploreFlags(appConfig, rootCmd)
 
 	loadEnvVars(appConfig)
 

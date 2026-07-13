@@ -9,67 +9,41 @@ import (
 type workspaceContextResponse struct {
 	CurrentWorkingDirectoryPath string   `json:"currentWorkingDirectoryPath"`
 	ParentDirectoryPath         string   `json:"parentDirectoryPath"`
-	SiblingProjectCount         int      `json:"siblingProjectCount"`
-	GitSiblingProjects          []string `json:"gitSiblingProjects"`
-	SiblingProjects             []string `json:"siblingProjects"`
+	ParentScanPerformed         bool     `json:"parentScanPerformed"`
+	SiblingProjectCount         *int     `json:"siblingProjectCount,omitempty"`
+	SiblingProjects             []string `json:"siblingProjects,omitempty"`
 }
 
-func buildWorkspaceContext(verbose bool) (workspaceContextResponse, error) {
+func buildWorkspaceContext(verbose bool, parentScanDepth int) (workspaceContextResponse, error) {
 	_ = verbose
 	cwd, err := os.Getwd()
 	if err != nil {
 		return workspaceContextResponse{}, err
 	}
 
-	parent := filepath.Dir(cwd)
-	gitSiblings, siblings, err := listSiblingProjects(parent, cwd)
+	resp := workspaceContextResponse{
+		CurrentWorkingDirectoryPath: cwd,
+		ParentDirectoryPath:         filepath.Dir(cwd),
+		ParentScanPerformed:         parentScanDepth > 0,
+	}
+	if parentScanDepth < 1 {
+		return resp, nil
+	}
+
+	siblings, err := listParentProjects(cwd, parentScanDepth)
 	if err != nil {
 		return workspaceContextResponse{}, err
 	}
 
-	return workspaceContextResponse{
-		CurrentWorkingDirectoryPath: cwd,
-		ParentDirectoryPath:         parent,
-		SiblingProjectCount:         len(gitSiblings) + len(siblings),
-		GitSiblingProjects:          gitSiblings,
-		SiblingProjects:             siblings,
-	}, nil
-}
-
-func listSiblingProjects(parent, cwd string) (gitSiblings, siblings []string, err error) {
-	entries, err := os.ReadDir(parent)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	gitSiblings = make([]string, 0)
-	siblings = make([]string, 0)
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		absPath := filepath.Join(parent, entry.Name())
-		if absPath == cwd {
-			continue
-		}
-
-		relPath, err := filepath.Rel(cwd, absPath)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		path := filepath.ToSlash(relPath)
-		if hasGitMetadata(absPath) {
-			gitSiblings = append(gitSiblings, path)
-			continue
-		}
-		siblings = append(siblings, path)
-	}
-
-	sort.Strings(gitSiblings)
 	sort.Strings(siblings)
-	return gitSiblings, siblings, nil
+
+	count := len(siblings)
+	resp.SiblingProjectCount = &count
+	if len(siblings) > 0 {
+		resp.SiblingProjects = siblings
+	}
+
+	return resp, nil
 }
 
 func hasGitMetadata(dir string) bool {

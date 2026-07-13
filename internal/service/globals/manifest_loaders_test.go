@@ -27,6 +27,9 @@ func TestManifestLoadersShape(t *testing.T) {
 		if ManifestLoaders[fileName] == nil {
 			t.Fatalf("ManifestLoaders missing %q", fileName)
 		}
+		if ManifestLoaderTags[fileName] == "" {
+			t.Fatalf("ManifestLoaderTags missing %q", fileName)
+		}
 	}
 }
 

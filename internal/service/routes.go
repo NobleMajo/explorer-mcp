@@ -6,5 +6,5 @@ import (
 )
 
 func registerRoutes(server *mcpsdk.Server, cfg *config.AppConfig) {
-	registerExploreTool(server, cfg.Verbose)
+	registerExploreTool(server, exploreSettingsFromConfig(cfg))
 }

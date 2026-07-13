@@ -10,6 +10,8 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
+const testRepoScanDepth = 7
+
 func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
@@ -33,7 +35,7 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -43,17 +45,17 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.EntryCount != len(resp.Entries) {
-		t.Fatalf("entryCount = %d, len(entries) = %d", resp.EntryCount, len(resp.Entries))
+	if resp.EntryCount == nil || *resp.EntryCount != len(resp.Entries) {
+		t.Fatalf("entryCount = %v, len(entries) = %d", resp.EntryCount, len(resp.Entries))
 	}
 
 	names := entryBaseNames(resp.Entries)
-	for _, forbidden := range append(slices.Clone(globals.ScanIgnoreFiles), "ignored.txt", "ignored-output", "skip.txt", "notes.tmp") {
+	for _, forbidden := range append(slices.Clone(globals.ScanIgnoreFiles), "ignored.txt") {
 		if slices.Contains(names, forbidden) {
 			t.Fatalf("expected %q to be ignored, entries=%v", forbidden, names)
 		}
 	}
-	for _, required := range []string{"main.go", "app.go"} {
+	for _, required := range []string{"main.go", "app.go", "skip.txt", "notes.tmp"} {
 		if !slices.Contains(names, required) {
 			t.Fatalf("expected %q in entries, got %v", required, names)
 		}
@@ -62,6 +64,25 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 		if strings.HasSuffix(path, "/") {
 			t.Fatalf("expected file path, got directory path %q", path)
 		}
+	}
+}
+
+func TestRepoStructureDepthZero(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(0)()(false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	if resp.RepoScanPerformed {
+		t.Fatal("expected repoScanPerformed false")
+	}
+	if resp.EntryCount != nil || len(resp.Entries) != 0 {
+		t.Fatalf("expected no entries, got %+v", resp)
 	}
 }
 
@@ -75,7 +96,7 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	testutil.WriteFile(t, root+"/afile.go", "package a\n")
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
+	if err := appendStructureEntries(root, root, 0, testRepoScanDepth, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -96,9 +117,10 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 }
 
 func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
+	const maxDepth = 3
 	root := t.TempDir()
 	deep := root
-	for i := 0; i < globals.StructureScanMaxDepth+2; i++ {
+	for i := 0; i < maxDepth+2; i++ {
 		deep = deep + "/level"
 		if err := os.MkdirAll(deep, 0o755); err != nil {
 			t.Fatal(err)
@@ -107,23 +129,23 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
+	if err := appendStructureEntries(root, root, 0, maxDepth, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
-	maxDepth := 0
+	gotMaxDepth := 0
 	for _, path := range entries {
 		depth := strings.Count(path, "/") + 1
-		if depth > maxDepth {
-			maxDepth = depth
+		if depth > gotMaxDepth {
+			gotMaxDepth = depth
 		}
 	}
-	if maxDepth > globals.StructureScanMaxDepth {
-		t.Fatalf("max entry depth = %d, want <= %d", maxDepth, globals.StructureScanMaxDepth)
+	if gotMaxDepth > maxDepth {
+		t.Fatalf("max entry depth = %d, want <= %d", gotMaxDepth, maxDepth)
 	}
 }
 
-func TestRepoStructureFollowsGitIgnore(t *testing.T) {
+func TestRepoStructureDoesNotFollowGitIgnore(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
 	testutil.WriteFile(t, root+"/.gitignore", "build/\n*.log\n")
@@ -135,86 +157,20 @@ func TestRepoStructureFollowsGitIgnore(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
 
 	resp := result.(repoStructureResponse)
 	names := entryBaseNames(resp.Entries)
-	for _, forbidden := range []string{"build", "out.go", "app.log"} {
-		if slices.Contains(names, forbidden) {
-			t.Fatalf("expected %q to be gitignored, entries=%v", forbidden, names)
+	for _, want := range []string{"main.go", "out.go", "app.log"} {
+		if !slices.Contains(names, want) {
+			t.Fatalf("expected %q in entries, got %v", want, names)
 		}
 	}
-	if !slices.Contains(names, "main.go") {
-		t.Fatalf("expected main.go in entries, got %v", names)
-	}
-}
-
-func TestRepoStructureNestedGitIgnore(t *testing.T) {
-	root := t.TempDir()
-	testutil.WriteFile(t, root+"/main.go", "package main\n")
-	if err := os.MkdirAll(root+"/pkg", 0o755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, root+"/pkg/.gitignore", "generated/\n")
-	testutil.WriteFile(t, root+"/pkg/manual.go", "package pkg\n")
-	if err := os.MkdirAll(root+"/pkg/generated", 0o755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, root+"/pkg/generated/skip.go", "package generated\n")
-
-	testutil.Chdir(t, root)
-
-	result, err := StructureOverview()(false)
-	if err != nil {
-		t.Fatalf("StructureOverview() error: %v", err)
-	}
-
-	resp := result.(repoStructureResponse)
-	names := entryBaseNames(resp.Entries)
-	for _, forbidden := range []string{"generated", "skip.go"} {
-		if slices.Contains(names, forbidden) {
-			t.Fatalf("expected %q to be gitignored, entries=%v", forbidden, names)
-		}
-	}
-	if !slices.Contains(names, "manual.go") {
-		t.Fatalf("expected manual.go in entries, got %v", names)
-	}
-	if slices.Contains(names, "pkg") {
-		t.Fatalf("expected no directory entries, got %v", names)
-	}
-}
-
-func TestRepoStructureFollowGitIgnoreDisabled(t *testing.T) {
-	old := globals.FollowGitIgnore
-	globals.FollowGitIgnore = false
-	t.Cleanup(func() { globals.FollowGitIgnore = old })
-
-	root := t.TempDir()
-	testutil.WriteFile(t, root+"/main.go", "package main\n")
-	testutil.WriteFile(t, root+"/.gitignore", "build/\n")
-	if err := os.MkdirAll(root+"/build", 0o755); err != nil {
-		t.Fatal(err)
-	}
-	testutil.WriteFile(t, root+"/build/out.go", "package build\n")
-
-	testutil.Chdir(t, root)
-
-	result, err := StructureOverview()(false)
-	if err != nil {
-		t.Fatalf("StructureOverview() error: %v", err)
-	}
-
-	resp := result.(repoStructureResponse)
-
-	names := entryBaseNames(resp.Entries)
-	if !slices.Contains(names, "out.go") {
-		t.Fatalf("expected out.go when gitignore disabled, entries=%v", names)
-	}
-	if slices.Contains(names, "build") {
-		t.Fatalf("expected no directory entries, got %v", names)
+	if slices.Contains(names, ".gitignore") {
+		t.Fatalf("expected .gitignore omitted, entries=%v", names)
 	}
 }
 
@@ -224,7 +180,7 @@ func TestRepoStructureIncludesEnvFiles(t *testing.T) {
 	testutil.WriteFile(t, root+"/.env.project", "PROJECT_VERSION=1.0.0\n")
 	testutil.Chdir(t, root)
 
-	result, err := StructureOverview()(false)
+	result, err := StructureOverview(testRepoScanDepth)()(false)
 	if err != nil {
 		t.Fatalf("StructureOverview() error: %v", err)
 	}
@@ -245,7 +201,7 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 	}
 
 	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, &entries, newScanState()); err != nil {
+	if err := appendStructureEntries(root, root, 0, testRepoScanDepth, &entries); err != nil {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
@@ -262,7 +218,7 @@ func TestAppendStructureEntriesSkipsIgnoredFiles(t *testing.T) {
 
 func TestAppendStructureEntriesMissingDir(t *testing.T) {
 	entries := make([]string, 0)
-	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, &entries, newScanState())
+	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, testRepoScanDepth, &entries)
 	if err == nil {
 		t.Fatal("expected error for missing directory")
 	}

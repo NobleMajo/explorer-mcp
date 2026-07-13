@@ -13,6 +13,6 @@ func InitMcpService(cfg *config.AppConfig, name, version string) error {
 	return server.Run(context.Background(), &mcpsdk.StdioTransport{})
 }
 
-func DirectJsonResult(verbose bool) (string, error) {
-	return buildExploreResponse(verbose)
+func DirectJsonResult(cfg *config.AppConfig) (string, error) {
+	return buildExploreResponse(exploreSettingsFromConfig(cfg))
 }

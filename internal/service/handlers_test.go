@@ -140,12 +140,12 @@ func TestExploreCombinesToolSections(t *testing.T) {
 		t.Fatalf("git init failed: %v\n%s", err, out)
 	}
 
-	jsonText, err := buildExploreResponse(false)
+	jsonText, err := buildExploreResponse(testExploreSettings(false))
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
 	}
 
-	jsonTextVerbose, err := buildExploreResponse(true)
+	jsonTextVerbose, err := buildExploreResponse(testExploreSettings(true))
 	if err != nil {
 		t.Fatalf("buildExploreResponse(true) error: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestExploreCombinesToolSections(t *testing.T) {
 		t.Fatalf("projectRootPath = %q, want %q", resp.ProjectRootPath, root)
 	}
 
-	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "entryCount")
+	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "repoScanPerformed")
 	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "rootPath")
 	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "projectRootPath")
 	assertSectionHasField(t, "gitOverview", resp.GitOverview, "isGitAvailable")
@@ -196,7 +196,7 @@ func TestBuildExploreResponsePropagatesSectionError(t *testing.T) {
 	testutil.WriteFile(t, root+"/package.json", `{invalid`)
 	testutil.Chdir(t, root)
 
-	_, err := buildExploreResponse(false)
+	_, err := buildExploreResponse(testExploreSettings(false))
 	if err == nil {
 		t.Fatal("expected buildExploreResponse error from invalid package.json")
 	}
@@ -213,7 +213,7 @@ func TestBuildExploreResponseMakefileReadError(t *testing.T) {
 
 	testutil.Chdir(t, root)
 
-	_, err := buildExploreResponse(false)
+	_, err := buildExploreResponse(testExploreSettings(false))
 	if err == nil {
 		t.Fatal("expected buildExploreResponse error from unreadable Makefile")
 	}
@@ -223,9 +223,9 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 	t.Parallel()
 
 	instructions := buildAgentBehaviorInstructions(exploreSections{
-		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 0}),
+		repoStructure:     mustRawJSON(t, map[string]any{"repoScanPerformed": false}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"gitSiblingProjects": []string{}, "siblingProjects": []string{}}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
 		dependencies:      mustRawJSON(t, []string{}),
 		containerOverview: mustRawJSON(t, map[string]any{}),
 		projectTools:      mustRawJSON(t, map[string]any{}),
@@ -249,7 +249,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "structure with entries",
 			domain: "structure",
 			sect: exploreSections{
-				repoStructure: mustRawJSON(t, map[string]any{"entryCount": 2}),
+				repoStructure: mustRawJSON(t, map[string]any{"repoScanPerformed": true, "entryCount": 2}),
 			},
 			want: true,
 		},
@@ -257,7 +257,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "structure empty",
 			domain: "structure",
 			sect: exploreSections{
-				repoStructure: mustRawJSON(t, map[string]any{"entryCount": 0}),
+				repoStructure: mustRawJSON(t, map[string]any{"repoScanPerformed": true, "entryCount": 0}),
 			},
 			want: false,
 		},
@@ -282,7 +282,8 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "parent",
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
-					"siblingProjects": []string{"../other"},
+					"parentScanPerformed": true,
+					"siblingProjects":     []string{"../other"},
 				}),
 			},
 			want: true,
@@ -292,8 +293,8 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "parent",
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
-					"gitSiblingProjects": []string{},
-					"siblingProjects":    []string{},
+					"parentScanPerformed": true,
+					"siblingProjects":     []string{},
 				}),
 			},
 			want: false,
@@ -487,9 +488,9 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 	t.Parallel()
 
 	sections := exploreSections{
-		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 1}),
+		repoStructure:     mustRawJSON(t, map[string]any{"repoScanPerformed": true, "entryCount": 1}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []string{"../other"}}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
 		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 direct"}),
 		containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
 		projectTools:      mustRawJSON(t, map[string]any{"makefileTargetCount": 1}),
@@ -517,7 +518,7 @@ func TestBuildAgentBehaviorInstructionsSkipsEmptyDomainText(t *testing.T) {
 	catalog["git"] = ""
 
 	sections := exploreSections{
-		repoStructure: mustRawJSON(t, map[string]any{"entryCount": 0}),
+		repoStructure: mustRawJSON(t, map[string]any{"repoScanPerformed": true, "entryCount": 0}),
 		gitOverview:   mustRawJSON(t, map[string]any{"isGitRepo": true}),
 	}
 
@@ -643,5 +644,44 @@ func assertSectionHasField(t *testing.T, field string, raw json.RawMessage, want
 	}
 	if _, ok := section[wantField]; !ok {
 		t.Fatalf("%s missing field %q", field, wantField)
+	}
+}
+
+func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(exploreSettings{
+		recentCommitCount: 0,
+		parentScanDepth:   0,
+		repoScanDepth:     0,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp exploreResponse
+	testutil.ParseJSON(t, jsonText, &resp)
+
+	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "repoScanPerformed")
+	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "entries")
+	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "entryCount")
+
+	assertSectionHasField(t, "gitOverview", resp.GitOverview, "recentCommitsListed")
+	assertSectionMissingField(t, "gitOverview", resp.GitOverview, "recentCommits")
+	assertSectionMissingField(t, "gitOverview", resp.GitOverview, "recentCommitCount")
+
+	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "parentScanPerformed")
+	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "siblingProjects")
+	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "siblingProjectCount")
+}
+
+func testExploreSettings(verbose bool) exploreSettings {
+	return exploreSettings{
+		verbose:           verbose,
+		recentCommitCount: 10,
+		parentScanDepth:   3,
+		repoScanDepth:     7,
 	}
 }

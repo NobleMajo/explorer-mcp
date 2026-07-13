@@ -1,28 +1,30 @@
 package git
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 )
 
 type gitOverviewResponse struct {
-	IsGitAvailable          bool             `json:"isGitAvailable"`
-	IsGitRepo               bool             `json:"isGitRepo"`
-	IsInsideWorkTree        bool             `json:"isInsideWorkTree"`
-	CurrentBranchName       string           `json:"currentBranchName"`
-	IsDetachedHead          bool             `json:"isDetachedHead"`
-	DetachedHeadCommitHash  string           `json:"detachedHeadCommitHash"`
-	IsWorkingTreeClean      bool             `json:"isWorkingTreeClean"`
-	ChangedFileCount        int              `json:"changedFileCount"`
-	ChangedFiles            []string         `json:"changedFiles"`
-	RecentCommitCount       int              `json:"recentCommitCount"`
-	RecentCommits           []string         `json:"recentCommits"`
-	UnstagedDiffStatSummary []string         `json:"unstagedDiffStatSummary"`
-	ErrorMessage            string           `json:"errorMessage,omitempty"`
+	IsGitAvailable          bool     `json:"isGitAvailable"`
+	IsGitRepo               bool     `json:"isGitRepo"`
+	IsInsideWorkTree        bool     `json:"isInsideWorkTree"`
+	CurrentBranchName       string   `json:"currentBranchName"`
+	IsDetachedHead          bool     `json:"isDetachedHead"`
+	DetachedHeadCommitHash  string   `json:"detachedHeadCommitHash"`
+	IsWorkingTreeClean      bool     `json:"isWorkingTreeClean"`
+	ChangedFileCount        int      `json:"changedFileCount"`
+	ChangedFiles            []string `json:"changedFiles"`
+	RecentCommitsListed     bool     `json:"recentCommitsListed"`
+	RecentCommitCount       *int     `json:"recentCommitCount,omitempty"`
+	RecentCommits           []string `json:"recentCommits,omitempty"`
+	UnstagedDiffStatSummary []string `json:"unstagedDiffStatSummary"`
+	ErrorMessage            string   `json:"errorMessage,omitempty"`
 }
 
-func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
+func buildGitOverview(verbose bool, recentCommitCount int) (gitOverviewResponse, error) {
 	_ = verbose
 	dir, err := os.Getwd()
 	if err != nil {
@@ -31,8 +33,8 @@ func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
 
 	resp := gitOverviewResponse{
 		ChangedFiles:            []string{},
-		RecentCommits:           []string{},
 		UnstagedDiffStatSummary: []string{},
+		RecentCommitsListed:     recentCommitCount > 0,
 	}
 
 	if _, err := exec.LookPath("git"); err != nil {
@@ -62,9 +64,15 @@ func buildGitOverview(verbose bool) (gitOverviewResponse, error) {
 	resp.ChangedFileCount = len(resp.ChangedFiles)
 	resp.IsWorkingTreeClean = resp.ChangedFileCount == 0
 
-	logOut, _ := gitOutput(dir, "log", "-5", "--format=%h %s")
-	resp.RecentCommits = parseGitLog(logOut)
-	resp.RecentCommitCount = len(resp.RecentCommits)
+	if recentCommitCount > 0 {
+		logOut, _ := gitOutput(dir, "log", fmt.Sprintf("-%d", recentCommitCount), "--format=%h %s")
+		commits := parseGitLog(logOut)
+		count := len(commits)
+		resp.RecentCommitCount = &count
+		if len(commits) > 0 {
+			resp.RecentCommits = commits
+		}
+	}
 
 	statOut, _ := gitOutput(dir, "diff", "--stat")
 	resp.UnstagedDiffStatSummary = parseDiffStatSummary(statOut)

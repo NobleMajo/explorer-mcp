@@ -30,14 +30,6 @@ func TestScanIgnoreGlobalsShape(t *testing.T) {
 	}
 }
 
-func TestStructureScanMaxDepth(t *testing.T) {
-	t.Parallel()
-
-	if StructureScanMaxDepth != 3 {
-		t.Fatalf("StructureScanMaxDepth = %d, want 3", StructureScanMaxDepth)
-	}
-}
-
 func TestIsScanIgnoredCoversAllGlobals(t *testing.T) {
 	t.Parallel()
 
@@ -51,14 +43,6 @@ func TestIsScanIgnoredCoversAllGlobals(t *testing.T) {
 		if IsScanIgnored(name) {
 			t.Fatalf("IsScanIgnored(%q) = true, want false", name)
 		}
-	}
-}
-
-func TestFollowGitIgnoreDefault(t *testing.T) {
-	t.Parallel()
-
-	if !FollowGitIgnore {
-		t.Fatal("FollowGitIgnore = false, want true")
 	}
 }
 

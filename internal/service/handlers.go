@@ -28,14 +28,14 @@ var readOnlyToolAnnotations = &mcpsdk.ToolAnnotations{
 	ReadOnlyHint: true,
 }
 
-func registerExploreTool(server *mcpsdk.Server, verbose bool) {
+func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
 		Description: "Workspace overview as JSON with repoStructure, gitOverview, workspaceContext, dependencies, containerOverview, projectTools, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
 		return jsonToolResult(func() (string, error) {
-			return buildExploreResponse(verbose)
+			return buildExploreResponse(settings)
 		})
 	})
 }
@@ -59,42 +59,42 @@ type exploreResponse struct {
 	Dependencies        json.RawMessage   `json:"dependencies"`
 	ContainerOverview   json.RawMessage   `json:"containerOverview"`
 	ProjectTools                   json.RawMessage   `json:"projectTools"`
-	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction"`
-	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions"`
+	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction,omitempty"`
+	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
 
-func buildExploreResponse(verbose bool) (string, error) {
+func buildExploreResponse(settings exploreSettings) (string, error) {
 	projectRoot, err := os.Getwd()
 	if err != nil {
 		return "", err
 	}
 
-	repoStructure, err := overviewSection(structure.StructureOverview, verbose)
+	repoStructure, err := overviewSection(structure.StructureOverview(settings.repoScanDepth), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	gitOverview, err := overviewSection(git.GitOverview, verbose)
+	gitOverview, err := overviewSection(git.GitOverview(settings.recentCommitCount), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	workspaceContext, err := overviewSection(parent.ParentOverview, verbose)
+	workspaceContext, err := overviewSection(parent.ParentOverview(settings.parentScanDepth), settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	dependencies, err := overviewSection(deps.DepsOverview, verbose)
+	dependencies, err := overviewSection(deps.DepsOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	containerOverview, err := overviewSection(container.ContainerOverview, verbose)
+	containerOverview, err := overviewSection(container.ContainerOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
 
-	projectTools, err := overviewSection(tools.ToolsOverview, verbose)
+	projectTools, err := overviewSection(tools.ToolsOverview, settings.verbose)
 	if err != nil {
 		return "", err
 	}
@@ -108,21 +108,26 @@ func buildExploreResponse(verbose bool) (string, error) {
 		projectTools:      projectTools,
 	}
 
-	return marshalResponse(exploreResponse{
+	response := exploreResponse{
 		responseMeta: responseMeta{
 			ToolName:      "explore",
 			SchemaVersion: jsonresp.SchemaVersion,
 		},
-		ProjectRootPath:     projectRoot,
-		RepoStructure:       sections.repoStructure,
-		GitOverview:         sections.gitOverview,
-		WorkspaceContext:    sections.workspaceContext,
-		Dependencies:        sections.dependencies,
-		ContainerOverview:   sections.containerOverview,
-		ProjectTools:                 sections.projectTools,
-		AgentBehaviorMainInstruction: AgentBehaviorMainInstruction,
-		AgentBehaviorInstructions:    buildAgentBehaviorInstructions(sections),
-	})
+		ProjectRootPath:   projectRoot,
+		RepoStructure:     sections.repoStructure,
+		GitOverview:       sections.gitOverview,
+		WorkspaceContext:  sections.workspaceContext,
+		Dependencies:      sections.dependencies,
+		ContainerOverview: sections.containerOverview,
+		ProjectTools:      sections.projectTools,
+	}
+
+	if !settings.removeBehaviorInstruction {
+		response.AgentBehaviorMainInstruction = AgentBehaviorMainInstruction
+		response.AgentBehaviorInstructions = buildAgentBehaviorInstructions(sections)
+	}
+
+	return marshalResponse(response)
 }
 
 var agentBehaviorInstructionDomains = []string{
@@ -168,9 +173,16 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 	switch domainName {
 	case "structure":
 		var structure struct {
-			EntryCount int `json:"entryCount"`
+			RepoScanPerformed bool `json:"repoScanPerformed"`
+			EntryCount        int  `json:"entryCount"`
 		}
-		return json.Unmarshal(sections.repoStructure, &structure) == nil && structure.EntryCount > 0
+		if json.Unmarshal(sections.repoStructure, &structure) != nil {
+			return false
+		}
+		if !structure.RepoScanPerformed {
+			return false
+		}
+		return structure.EntryCount > 0
 	case "git":
 		var git struct {
 			IsGitRepo bool `json:"isGitRepo"`
@@ -178,13 +190,16 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		return json.Unmarshal(sections.gitOverview, &git) == nil && git.IsGitRepo
 	case "parent":
 		var parent struct {
-			GitSiblingProjects []string `json:"gitSiblingProjects"`
-			SiblingProjects    []string `json:"siblingProjects"`
+			ParentScanPerformed bool     `json:"parentScanPerformed"`
+			SiblingProjects     []string `json:"siblingProjects"`
 		}
 		if json.Unmarshal(sections.workspaceContext, &parent) != nil {
 			return false
 		}
-		return len(parent.GitSiblingProjects) > 0 || len(parent.SiblingProjects) > 0
+		if !parent.ParentScanPerformed {
+			return false
+		}
+		return len(parent.SiblingProjects) > 0
 	case "deps":
 		var deps []string
 		return json.Unmarshal(sections.dependencies, &deps) == nil && len(deps) > 0

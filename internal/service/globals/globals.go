@@ -1,5 +1,11 @@
 package globals
 
+import (
+	"os"
+	"path/filepath"
+	"sort"
+)
+
 var KnownContainerFileNames = []string{
 	"compose.yml",
 	"compose.yaml",
@@ -59,6 +65,28 @@ var ManifestLoaders = map[string]ManifestLoader{
 	"pyproject.toml":   LoadPyprojectManifest,
 }
 
+var ManifestLoaderTags = map[string]string{
+	"go.mod":           "@go",
+	"package.json":     "@npm",
+	"requirements.txt": "@pip",
+	"Cargo.toml":       "@cargo",
+	"pyproject.toml":   "@python",
+}
+
+func ManifestLoaderFileNames() []string {
+	fileNames := make([]string, 0, len(ManifestLoaders))
+	for fileName := range ManifestLoaders {
+		fileNames = append(fileNames, fileName)
+	}
+	sort.Strings(fileNames)
+	return fileNames
+}
+
+func HasManifestFile(dir, manifestFileName string) bool {
+	_, err := os.Stat(filepath.Join(dir, manifestFileName))
+	return err == nil
+}
+
 var ScanIgnoreFiles = []string{
 	".tmp",
 	"tmp",
@@ -70,9 +98,6 @@ var ScanIgnoreFiles = []string{
 	"node_modules",
 }
 
-const StructureScanMaxDepth = 3
-
-var FollowGitIgnore bool = true
 var IgnoreFiles = []string{
 	".gitignore",
 	".dockerignore",

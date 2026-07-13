@@ -106,7 +106,7 @@ func TestGitOverviewWithoutGitRepo(t *testing.T) {
 	root := t.TempDir()
 	testutil.Chdir(t, root)
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -129,7 +129,7 @@ func TestGitOverviewGitNotInPath(t *testing.T) {
 	testutil.Chdir(t, root)
 	t.Setenv("PATH", t.TempDir())
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -154,7 +154,7 @@ func TestGitOverviewInsideGitRepo(t *testing.T) {
 	runGit(t, root, "init")
 	testutil.WriteFile(t, root+"/README.md", "demo\n")
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -184,7 +184,7 @@ func TestGitOverviewReportsRecentCommits(t *testing.T) {
 	runGit(t, root, "add", "README.md")
 	runGit(t, root, "commit", "-m", "init")
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -193,8 +193,40 @@ func TestGitOverviewReportsRecentCommits(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.RecentCommitCount == 0 || len(resp.RecentCommits) == 0 {
+	if resp.RecentCommitCount == nil || *resp.RecentCommitCount == 0 || len(resp.RecentCommits) == 0 {
 		t.Fatalf("expected recent commits, got %+v", resp)
+	}
+	if !resp.RecentCommitsListed {
+		t.Fatal("expected recentCommitsListed true")
+	}
+}
+
+func TestGitOverviewSkipsRecentCommitsWhenZero(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+
+	runGit(t, root, "init")
+	runGit(t, root, "config", "user.email", "test@example.com")
+	runGit(t, root, "config", "user.name", "test")
+	testutil.WriteFile(t, root+"/README.md", "demo\n")
+	runGit(t, root, "add", "README.md")
+	runGit(t, root, "commit", "-m", "init")
+
+	result, err := GitOverview(0)()(false)
+	if err != nil {
+		t.Fatalf("GitOverview() error: %v", err)
+	}
+
+	resp := result.(gitOverviewResponse)
+	if resp.RecentCommitsListed {
+		t.Fatal("expected recentCommitsListed false")
+	}
+	if resp.RecentCommitCount != nil || len(resp.RecentCommits) != 0 {
+		t.Fatalf("expected no recent commit fields, got %+v", resp)
 	}
 }
 
@@ -214,7 +246,7 @@ func TestGitOverviewDirtyWorkingTree(t *testing.T) {
 	runGit(t, root, "commit", "-m", "init")
 	testutil.WriteFile(t, root+"/README.md", "changed\n")
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}
@@ -245,7 +277,7 @@ func TestGitOverviewDetachedHead(t *testing.T) {
 	runGit(t, root, "commit", "-m", "init")
 	runGit(t, root, "checkout", "--detach")
 
-	result, err := GitOverview()(false)
+	result, err := GitOverview(10)()(false)
 	if err != nil {
 		t.Fatalf("GitOverview() error: %v", err)
 	}

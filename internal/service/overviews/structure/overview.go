@@ -5,66 +5,46 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/NobleMajo/explorer-mcp/internal/gitignore"
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
 
 type repoStructureResponse struct {
-	EntryCount int      `json:"entryCount"`
-	Entries    []string `json:"entries"`
+	RepoScanPerformed bool     `json:"repoScanPerformed"`
+	EntryCount        *int     `json:"entryCount,omitempty"`
+	Entries           []string `json:"entries,omitempty"`
 }
 
-type scanState struct {
-	matchers []gitignore.DirMatcher
-}
-
-func newScanState() *scanState {
-	return &scanState{
-		matchers: make([]gitignore.DirMatcher, 0),
-	}
-}
-
-func (s *scanState) loadMatcherForDir(dir, root string) error {
-	if !globals.FollowGitIgnore {
-		return nil
-	}
-
-	matcher, err := gitignore.LoadDirMatcher(dir, root)
-	if err != nil {
-		return err
-	}
-	if matcher != nil {
-		s.matchers = append(s.matchers, *matcher)
-	}
-	return nil
-}
-
-func buildRepoStructure(verbose bool) (repoStructureResponse, error) {
+func buildRepoStructure(verbose bool, repoScanDepth int) (repoStructureResponse, error) {
 	_ = verbose
+	resp := repoStructureResponse{
+		RepoScanPerformed: repoScanDepth > 0,
+	}
+	if repoScanDepth < 1 {
+		return resp, nil
+	}
+
 	root, err := os.Getwd()
 	if err != nil {
 		return repoStructureResponse{}, err
 	}
 
 	entries := make([]string, 0)
-	state := newScanState()
-	if err := appendStructureEntries(root, root, 0, &entries, state); err != nil {
+	if err := appendStructureEntries(root, root, 0, repoScanDepth, &entries); err != nil {
 		return repoStructureResponse{}, err
 	}
 
-	return repoStructureResponse{
-		EntryCount: len(entries),
-		Entries:    entries,
-	}, nil
-}
-
-func appendStructureEntries(root, dir string, depth int, entries *[]string, state *scanState) error {
-	if depth >= globals.StructureScanMaxDepth {
-		return nil
+	count := len(entries)
+	resp.EntryCount = &count
+	if len(entries) > 0 {
+		resp.Entries = entries
 	}
 
-	if err := state.loadMatcherForDir(dir, root); err != nil {
-		return err
+	return resp, nil
+}
+
+func appendStructureEntries(root, dir string, depth, maxDepth int, entries *[]string) error {
+	if depth >= maxDepth {
+		return nil
 	}
 
 	dirEntries, err := os.ReadDir(dir)
@@ -86,12 +66,9 @@ func appendStructureEntries(root, dir string, depth int, entries *[]string, stat
 		if err != nil {
 			return err
 		}
-		if globals.FollowGitIgnore && gitignore.ShouldIgnore(state.matchers, relPath, entry.IsDir()) {
-			continue
-		}
 
 		if entry.IsDir() {
-			if err := appendStructureEntries(root, fullPath, depth+1, entries, state); err != nil {
+			if err := appendStructureEntries(root, fullPath, depth+1, maxDepth, entries); err != nil {
 				return err
 			}
 			continue
