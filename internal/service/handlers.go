@@ -123,14 +123,14 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		return "", fmt.Errorf("projectRootPath must be existing directory")
 	}
 
-	runSection := func(name string, disabled bool, fn func() resource.OverviewResource) (json.RawMessage, error) {
+	runSection := func(name string, disabled bool, fn func() resource.ExploreResource) (json.RawMessage, error) {
 		if disabled {
 			logf("%s: begin status=disabled", name)
 			return nil, nil
 		}
 		logf("%s: begin", name)
 		start := time.Now()
-		section, err := overviewSection(projectRootAbs, fn, settings.verbose)
+		section, err := exploreSection(projectRootAbs, fn, settings.verbose)
 		dur := time.Since(start)
 		if err != nil {
 			logf("%s: end status=error dur=%s", name, dur)
@@ -357,14 +357,14 @@ func hasProjectToolsData(projectTools json.RawMessage) bool {
 	return false
 }
 
-func optionalOverviewSection(projectRootPath string, disabled bool, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
+func optionalExploreSection(projectRootPath string, disabled bool, fn func() resource.ExploreResource, verbose bool) (json.RawMessage, error) {
 	if disabled {
 		return nil, nil
 	}
-	return overviewSection(projectRootPath, fn, verbose)
+	return exploreSection(projectRootPath, fn, verbose)
 }
 
-func overviewSection(projectRootPath string, fn func() resource.OverviewResource, verbose bool) (json.RawMessage, error) {
+func exploreSection(projectRootPath string, fn func() resource.ExploreResource, verbose bool) (json.RawMessage, error) {
 	result, err := fn()(projectRootPath, verbose)
 	if err != nil {
 		return nil, err

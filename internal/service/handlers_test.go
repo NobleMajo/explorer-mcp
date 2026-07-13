@@ -547,7 +547,7 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("embeds json", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection("test-root", func() resource.OverviewResource {
+		section, err := exploreSection("test-root", func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				if verbose {
@@ -557,7 +557,7 @@ func TestOverviewSection(t *testing.T) {
 			}
 		}, false)
 		if err != nil {
-			t.Fatalf("overviewSection() error: %v", err)
+			t.Fatalf("exploreSection() error: %v", err)
 		}
 
 		var sectionData map[string]int
@@ -571,7 +571,7 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("passes verbose", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection("test-root", func() resource.OverviewResource {
+		section, err := exploreSection("test-root", func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				if !verbose {
@@ -581,7 +581,7 @@ func TestOverviewSection(t *testing.T) {
 			}
 		}, true)
 		if err != nil {
-			t.Fatalf("overviewSection() error: %v", err)
+			t.Fatalf("exploreSection() error: %v", err)
 		}
 
 		var sectionData map[string]bool
@@ -595,7 +595,7 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("propagates error", func(t *testing.T) {
 		t.Parallel()
-		_, err := overviewSection("test-root", func() resource.OverviewResource {
+		_, err := exploreSection("test-root", func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				_ = verbose
@@ -603,13 +603,13 @@ func TestOverviewSection(t *testing.T) {
 			}
 		}, false)
 		if err == nil {
-			t.Fatal("expected overviewSection error")
+			t.Fatal("expected exploreSection error")
 		}
 	})
 
 	t.Run("marshal error", func(t *testing.T) {
 		t.Parallel()
-		_, err := overviewSection("test-root", func() resource.OverviewResource {
+		_, err := exploreSection("test-root", func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				_ = verbose
@@ -623,7 +623,7 @@ func TestOverviewSection(t *testing.T) {
 
 	t.Run("nil result omits section", func(t *testing.T) {
 		t.Parallel()
-		section, err := overviewSection("test-root", func() resource.OverviewResource {
+		section, err := exploreSection("test-root", func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				_ = verbose
@@ -631,10 +631,10 @@ func TestOverviewSection(t *testing.T) {
 			}
 		}, false)
 		if err != nil {
-			t.Fatalf("overviewSection() error: %v", err)
+			t.Fatalf("exploreSection() error: %v", err)
 		}
 		if section != nil {
-			t.Fatalf("overviewSection() = %q, want nil", section)
+			t.Fatalf("exploreSection() = %q, want nil", section)
 		}
 	})
 }
@@ -644,7 +644,7 @@ func TestOptionalOverviewSection(t *testing.T) {
 
 	t.Run("disabled", func(t *testing.T) {
 		t.Parallel()
-		section, err := optionalOverviewSection("test-root", true, func() resource.OverviewResource {
+		section, err := optionalExploreSection("test-root", true, func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				t.Fatal("overview should not run when disabled")
@@ -652,7 +652,7 @@ func TestOptionalOverviewSection(t *testing.T) {
 			}
 		}, false)
 		if err != nil {
-			t.Fatalf("optionalOverviewSection() error: %v", err)
+			t.Fatalf("optionalExploreSection() error: %v", err)
 		}
 		if section != nil {
 			t.Fatal("expected nil section when disabled")
@@ -661,14 +661,14 @@ func TestOptionalOverviewSection(t *testing.T) {
 
 	t.Run("enabled", func(t *testing.T) {
 		t.Parallel()
-		section, err := optionalOverviewSection("test-root", false, func() resource.OverviewResource {
+		section, err := optionalExploreSection("test-root", false, func() resource.ExploreResource {
 			return func(projectRootPath string, verbose bool) (any, error) {
 				_ = projectRootPath
 				return map[string]bool{"ok": true}, nil
 			}
 		}, false)
 		if err != nil {
-			t.Fatalf("optionalOverviewSection() error: %v", err)
+			t.Fatalf("optionalExploreSection() error: %v", err)
 		}
 		var data map[string]bool
 		if err := json.Unmarshal(section, &data); err != nil {

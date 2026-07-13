@@ -2,7 +2,7 @@ package deps
 
 import "github.com/NobleMajo/explorer-mcp/internal/service/resource"
 
-func DepsOverview() resource.OverviewResource {
+func DepsOverview() resource.ExploreResource {
 	return func(projectRootPath string, verbose bool) (any, error) {
 		return buildDependencies(projectRootPath, verbose)
 	}
