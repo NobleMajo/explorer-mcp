@@ -149,9 +149,8 @@ func TestGitOverviewInsideGitRepo(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-
-	if !resp.IsGitAvailable || !resp.IsGitRepo || !resp.IsInsideWorkTree {
-		t.Fatalf("unexpected git flags: isGitAvailable=%v isGitRepo=%v isInsideWorkTree=%v", resp.IsGitAvailable, resp.IsGitRepo, resp.IsInsideWorkTree)
+	if resp.CurrentBranchName == "" {
+		t.Fatalf("expected currentBranchName inside git repo, got %+v", resp)
 	}
 }
 
@@ -179,11 +178,39 @@ func TestGitOverviewReportsRecentCommits(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	if resp.CommitCount == nil || *resp.CommitCount != 1 || len(resp.SomeRecentCommits) == 0 {
+	if resp.CommitCount == nil || *resp.CommitCount != 1 || resp.SomeRecentCommits == nil || len(*resp.SomeRecentCommits) == 0 {
 		t.Fatalf("expected recent commits and commitCount=1, got %+v", resp)
 	}
-	if !resp.RecentCommitsListed {
-		t.Fatal("expected recentCommitsListed true")
+}
+
+func TestGitOverviewEmptyRepoRecentCommits(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+
+	runGit(t, root, "init")
+	testutil.WriteFile(t, root+"/README.md", "demo\n")
+
+	result, err := GitOverview(10)()(root, false)
+	if err != nil {
+		t.Fatalf("GitOverview() error: %v", err)
+	}
+
+	resp, ok := result.(gitOverviewResponse)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if resp.CommitCount != nil {
+		t.Fatalf("expected commitCount omitted, got %+v", resp.CommitCount)
+	}
+	if resp.SomeRecentCommits == nil {
+		t.Fatal("expected someRecentCommits present when fetch enabled")
+	}
+	if len(*resp.SomeRecentCommits) != 0 {
+		t.Fatalf("expected empty someRecentCommits, got %+v", *resp.SomeRecentCommits)
 	}
 }
 
@@ -208,11 +235,8 @@ func TestGitOverviewSkipsRecentCommitsWhenZero(t *testing.T) {
 	}
 
 	resp := result.(gitOverviewResponse)
-	if resp.RecentCommitsListed {
-		t.Fatal("expected recentCommitsListed false")
-	}
-	if len(resp.SomeRecentCommits) != 0 {
-		t.Fatalf("expected no recent commits, got %+v", resp.SomeRecentCommits)
+	if resp.SomeRecentCommits != nil {
+		t.Fatalf("expected someRecentCommits omitted when count is 0, got %+v", resp.SomeRecentCommits)
 	}
 	if resp.CommitCount == nil || *resp.CommitCount != 1 {
 		t.Fatalf("expected commitCount=1, got %+v", resp.CommitCount)
@@ -277,8 +301,8 @@ func TestGitOverviewCommitCountIsFullHistory(t *testing.T) {
 	if resp.CommitCount == nil || *resp.CommitCount != 2 {
 		t.Fatalf("commitCount = %v, want 2", resp.CommitCount)
 	}
-	if len(resp.SomeRecentCommits) != 1 {
-		t.Fatalf("someRecentCommits len = %d, want 1", len(resp.SomeRecentCommits))
+	if resp.SomeRecentCommits == nil || len(*resp.SomeRecentCommits) != 1 {
+		t.Fatalf("someRecentCommits len = %v, want 1", resp.SomeRecentCommits)
 	}
 }
 
@@ -308,8 +332,8 @@ func TestGitOverviewDetachedHead(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if !resp.IsDetachedHead || resp.DetachedHeadCommitHash == "" {
-		t.Fatalf("expected detached HEAD, got %+v", resp)
+	if resp.DetachedHeadCommitHash == nil || *resp.DetachedHeadCommitHash == "" {
+		t.Fatalf("expected detachedHeadCommitHash, got %+v", resp)
 	}
 	if resp.CommitCount == nil || *resp.CommitCount != 1 {
 		t.Fatalf("commitCount = %v, want 1", resp.CommitCount)

@@ -8,18 +8,13 @@ import (
 )
 
 type gitOverviewResponse struct {
-	IsGitAvailable          bool     `json:"isGitAvailable"`
-	IsGitRepo               bool     `json:"isGitRepo"`
-	IsInsideWorkTree        bool     `json:"isInsideWorkTree"`
 	CurrentBranchName       string   `json:"currentBranchName"`
-	IsDetachedHead          bool     `json:"isDetachedHead"`
-	DetachedHeadCommitHash  string   `json:"detachedHeadCommitHash"`
+	DetachedHeadCommitHash  *string  `json:"detachedHeadCommitHash,omitempty"`
 	IsWorkingTreeClean      bool     `json:"isWorkingTreeClean"`
 	ChangedFileCount        int      `json:"changedFileCount"`
-	ChangedFiles            []string `json:"changedFiles"`
-	RecentCommitsListed     bool     `json:"recentCommitsListed"`
-	CommitCount             *int     `json:"commitCount,omitempty"`
-	SomeRecentCommits       []string `json:"someRecentCommits,omitempty"`
+	ChangedFiles            []string  `json:"changedFiles"`
+	CommitCount             *int      `json:"commitCount,omitempty"`
+	SomeRecentCommits       *[]string `json:"someRecentCommits,omitempty"`
 	UnstagedDiffStatSummary []string `json:"unstagedDiffStatSummary"`
 	ErrorMessage            string   `json:"errorMessage,omitempty"`
 }
@@ -38,12 +33,8 @@ func buildGitOverview(projectRootPath string, verbose bool, recentCommitCount in
 	}
 
 	resp := gitOverviewResponse{
-		IsGitAvailable:          true,
 		ChangedFiles:            []string{},
 		UnstagedDiffStatSummary: []string{},
-		RecentCommitsListed:     recentCommitCount > 0,
-		IsGitRepo:               true,
-		IsInsideWorkTree:        true,
 	}
 
 	if count, ok := gitHistoryCommitCount(dir); ok {
@@ -53,8 +44,9 @@ func buildGitOverview(projectRootPath string, verbose bool, recentCommitCount in
 	branch, _ := gitOutput(dir, "branch", "--show-current")
 	resp.CurrentBranchName = branch
 	if branch == "" {
-		resp.IsDetachedHead = true
-		resp.DetachedHeadCommitHash, _ = gitOutput(dir, "rev-parse", "--short", "HEAD")
+		if hash, err := gitOutput(dir, "rev-parse", "--short", "HEAD"); err == nil && hash != "" {
+			resp.DetachedHeadCommitHash = &hash
+		}
 	}
 
 	statusOut, _ := gitOutput(dir, "status", "--short")
@@ -65,9 +57,7 @@ func buildGitOverview(projectRootPath string, verbose bool, recentCommitCount in
 	if recentCommitCount > 0 {
 		logOut, _ := gitOutput(dir, "log", fmt.Sprintf("-%d", recentCommitCount), "--format=%h %s")
 		commits := parseGitLog(logOut)
-		if len(commits) > 0 {
-			resp.SomeRecentCommits = commits
-		}
+		resp.SomeRecentCommits = &commits
 	}
 
 	statOut, _ := gitOutput(dir, "diff", "--stat")
