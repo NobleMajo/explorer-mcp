@@ -187,7 +187,7 @@ func TestExploreCombinesToolSections(t *testing.T) {
 
 	assertSectionHasField(t, "structure", resp.Structure, "repoScanDepthLimit")
 	assertSectionMissingField(t, "structure", resp.Structure, "rootPath")
-	assertSectionHasField(t, "git", resp.Git, "isGitRepo")
+	assertSectionHasField(t, "git", resp.Git, "currentBranchName")
 	assertSectionHasField(t, "workspace", resp.Workspace, "parentScanPerformed")
 	assertSectionMissingField(t, "workspace", resp.Workspace, "currentWorkingDirectoryPath")
 	assertSectionIsJSONArray(t, "dependencies", resp.Dependencies)
@@ -245,7 +245,7 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 
 	instructions := buildAgentBehaviorInstructions(exploreSections{
 		structure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 0}),
-		git:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
+		git:       nil,
 		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
 		dependencies:      mustRawJSON(t, []string{}),
 		container: mustRawJSON(t, map[string]any{}),
@@ -286,17 +286,15 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "git repo",
 			domain: "git",
 			sect: exploreSections{
-				git: mustRawJSON(t, map[string]any{"isGitRepo": true}),
+				git: mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
 			},
 			want: true,
 		},
 		{
-			name:   "git not repo",
+			name:   "git omitted",
 			domain: "git",
-			sect: exploreSections{
-				git: mustRawJSON(t, map[string]any{"isGitRepo": false}),
-			},
-			want: false,
+			sect:   exploreSections{},
+			want:   false,
 		},
 		{
 			name:   "parent with sibling",
@@ -501,7 +499,7 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 
 	sections := exploreSections{
 		structure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 1}),
-		git:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
+		git:       mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
 		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
 		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
 		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
@@ -533,7 +531,7 @@ func TestBuildAgentBehaviorInstructionsSkipsEmptyDomainText(t *testing.T) {
 
 	sections := exploreSections{
 		structure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 0}),
-		git:   mustRawJSON(t, map[string]any{"isGitRepo": true}),
+		git:   mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
 	}
 
 	instructions := buildAgentBehaviorInstructionsWith(sections, catalog)
@@ -1125,7 +1123,6 @@ func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
 	assertSectionMissingField(t, "structure", resp.Structure, "entries")
 	assertSectionMissingField(t, "structure", resp.Structure, "entryCount")
 
-	assertSectionHasField(t, "git", resp.Git, "recentCommitsListed")
 	assertSectionMissingField(t, "git", resp.Git, "recentCommitCount")
 	assertSectionMissingField(t, "git", resp.Git, "someRecentCommits")
 

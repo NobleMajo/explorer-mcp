@@ -289,10 +289,7 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		}
 		return structure.EntryCount > 0
 	case "git":
-		var git struct {
-			IsGitRepo bool `json:"isGitRepo"`
-		}
-		return json.Unmarshal(sections.git, &git) == nil && git.IsGitRepo
+		return len(sections.git) > 0 && json.Valid(sections.git)
 	case "parent":
 		var parent struct {
 			ParentScanPerformed bool     `json:"parentScanPerformed"`
