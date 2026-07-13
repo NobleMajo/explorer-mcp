@@ -151,7 +151,7 @@ func TestGitOverviewInsideGitRepo(t *testing.T) {
 	}
 
 	if !resp.IsGitAvailable || !resp.IsGitRepo || !resp.IsInsideWorkTree {
-		t.Fatalf("unexpected git flags: %+v", resp)
+		t.Fatalf("unexpected git flags: isGitAvailable=%v isGitRepo=%v isInsideWorkTree=%v", resp.IsGitAvailable, resp.IsGitRepo, resp.IsInsideWorkTree)
 	}
 }
 

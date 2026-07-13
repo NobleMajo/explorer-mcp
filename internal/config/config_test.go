@@ -15,6 +15,9 @@ func TestParseConfigPrintCommand(t *testing.T) {
 	if !cfg.PrintAll {
 		t.Fatal("expected PrintAll true")
 	}
+	if cfg.EnableCliOverview {
+		t.Fatal("expected EnableCliOverview false by default")
+	}
 }
 
 func TestParseConfigParentScanFlags(t *testing.T) {
@@ -110,6 +113,32 @@ func TestParseConfigEnableCliOverviewFlag(t *testing.T) {
 
 	if !cfg.EnableCliOverview {
 		t.Fatal("expected EnableCliOverview true")
+	}
+}
+
+func TestParseConfigEnableCliOverviewEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("ENABLE_CLI_OVERVIEW", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableCliOverview {
+		t.Fatal("expected ENABLE_CLI_OVERVIEW env to enable cli overview")
+	}
+}
+
+func TestParseConfigDisableBehaviorInstructionEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("DISABLE_BEHAVIOR_INSTRUCTION", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.DisableBehaviorInstruction {
+		t.Fatal("expected DISABLE_BEHAVIOR_INSTRUCTION env to disable behavior")
 	}
 }
 
