@@ -45,6 +45,19 @@ func TestHasEnabledOverview(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "only opencode enabled",
+			s: exploreSettings{
+				disableStructureOverview:    true,
+				disableGitOverview:          true,
+				disableWorkspaceOverview:    true,
+				disableDependenciesOverview: true,
+				disableContainerOverview:    true,
+				disableToolsOverview:        true,
+				enableOpencodeOverview:      true,
+			},
+			want: true,
+		},
+		{
 			name: "only structure enabled",
 			s: exploreSettings{
 				disableGitOverview:          true,
@@ -84,6 +97,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		DisableContainerOverview:    true,
 		DisableToolsOverview:        true,
 		EnableCliOverview:           true,
+		EnableOpencodeOverview:      true,
 	}
 
 	settings := exploreSettingsFromConfig(cfg)
@@ -100,7 +114,8 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.disableDependenciesOverview != cfg.DisableDependenciesOverview ||
 		settings.disableContainerOverview != cfg.DisableContainerOverview ||
 		settings.disableToolsOverview != cfg.DisableToolsOverview ||
-		settings.enableCliOverview != cfg.EnableCliOverview {
+		settings.enableCliOverview != cfg.EnableCliOverview ||
+		settings.enableOpencodeOverview != cfg.EnableOpencodeOverview {
 		t.Fatalf("exploreSettingsFromConfig() = %+v, want mapped fields from cfg", settings)
 	}
 
@@ -116,5 +131,8 @@ func TestExploreSettingsFromConfigNil(t *testing.T) {
 	}
 	if settings.enableCliOverview {
 		t.Fatal("expected cli disabled by default")
+	}
+	if settings.enableOpencodeOverview {
+		t.Fatal("expected opencode disabled by default")
 	}
 }

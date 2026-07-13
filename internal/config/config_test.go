@@ -153,6 +153,31 @@ func TestParseConfigEnableBehaviorInstructionEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigEnableOpencodeOverviewFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-O"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableOpencodeOverview {
+		t.Fatal("expected EnableOpencodeOverview true")
+	}
+}
+
+func TestParseConfigEnableOpencodeOverviewEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("ENABLE_OPENCODE_OVERVIEW", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableOpencodeOverview {
+		t.Fatal("expected ENABLE_OPENCODE_OVERVIEW env to enable opencode overview")
+	}
+}
+
 func TestParseConfigExploreFlagsBeforePrint(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })

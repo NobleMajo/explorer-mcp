@@ -777,9 +777,9 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 			omit:     "tools",
 		},
 		{
-			name:     "cli",
-			settings: exploreSettings{repoScanDepth: 6, enableCliOverview: false},
-			omit:     "cli",
+			name:     "opencode",
+			settings: exploreSettings{repoScanDepth: 6, enableOpencodeOverview: false},
+			omit:     "opencode",
 		},
 	}
 
@@ -832,6 +832,81 @@ func TestDirectJsonResultAllOverviewsDisabled(t *testing.T) {
 	})
 	if !errors.Is(err, ErrAllOverviewsDisabled) {
 		t.Fatalf("DirectJsonResult() error = %v, want ErrAllOverviewsDisabled", err)
+	}
+}
+
+func TestBuildExploreResponseOpencodeDisabledByDefault(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(exploreSettings{repoScanDepth: 6})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["opencode"]; ok {
+		t.Fatal("expected opencode section omitted by default")
+	}
+}
+
+func TestBuildExploreResponseOpencodeOmittedWithoutCLI(t *testing.T) {
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", t.TempDir())
+
+	jsonText, err := buildExploreResponse(exploreSettings{
+		enableOpencodeOverview: true,
+		repoScanDepth:          6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["opencode"]; ok {
+		t.Fatal("expected opencode omitted when cli not in PATH")
+	}
+}
+
+func TestBuildExploreResponseOpencodePresentWithCLI(t *testing.T) {
+	binDir := t.TempDir()
+	path := filepath.Join(binDir, "opencode")
+	testutil.WriteFile(t, path, "#!/bin/sh\nif [ \"$1\" = debug ] && [ \"$2\" = agent ] && [ \"$3\" = build ]; then echo '{\"permission\":[{\"permission\":\"bash\",\"pattern\":\"*\",\"action\":\"ask\"}],\"tools\":{\"bash\":true}}'; fi\n")
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", binDir)
+
+	jsonText, err := buildExploreResponse(exploreSettings{
+		enableOpencodeOverview:      true,
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["opencode"]; !ok {
+		t.Fatal("expected opencode section when cli stub in PATH")
 	}
 }
 

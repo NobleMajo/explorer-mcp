@@ -10,6 +10,7 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/container"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/deps"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/git"
+	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/opencode"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/parent"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/structure"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/tools"
@@ -32,7 +33,7 @@ var readOnlyToolAnnotations = &mcpsdk.ToolAnnotations{
 func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
-		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, agentBehaviorMainInstruction, and agentBehaviorInstructions",
+		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
 		return jsonToolResult(func() (string, error) {
@@ -61,6 +62,7 @@ type exploreResponse struct {
 	Container                      json.RawMessage   `json:"container,omitempty"`
 	Tools                          json.RawMessage   `json:"tools,omitempty"`
 	CLI                            json.RawMessage   `json:"cli,omitempty"`
+	Opencode                       json.RawMessage   `json:"opencode,omitempty"`
 	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction,omitempty"`
 	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
@@ -110,6 +112,11 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		return "", err
 	}
 
+	opencodeOverview, err := optionalOverviewSection(!settings.enableOpencodeOverview, opencode.OpencodeOverview, settings.verbose)
+	if err != nil {
+		return "", err
+	}
+
 	sections := exploreSections{
 		structure:     repoStructure,
 		git:           gitOverview,
@@ -118,6 +125,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		container:     containerOverview,
 		tools:         projectTools,
 		cli:           cliOverview,
+		opencode:      opencodeOverview,
 	}
 
 	response := exploreResponse{
@@ -133,6 +141,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		Container:   sections.container,
 		Tools:       sections.tools,
 		CLI:         sections.cli,
+		Opencode:    sections.opencode,
 	}
 
 	if settings.enableBehaviorInstruction {
@@ -181,6 +190,7 @@ type exploreSections struct {
 	container     json.RawMessage
 	tools         json.RawMessage
 	cli           json.RawMessage
+	opencode      json.RawMessage
 }
 
 func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool {
