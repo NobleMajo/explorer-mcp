@@ -7,6 +7,14 @@ import (
 	"strings"
 )
 
+type ManifestDepsSettings struct {
+	ShowGoToolDeps bool
+}
+
+func DefaultManifestDepsSettings() ManifestDepsSettings {
+	return ManifestDepsSettings{ShowGoToolDeps: true}
+}
+
 type ManifestLoader func(root, manifestPath string) (string, []string, bool, error)
 
 type ProjectIdentifier func(path string, subfiles []string, subdirs []string) ([]string, error)
@@ -112,11 +120,19 @@ var CommonCLIToolNames = []string{
 }
 
 var ManifestLoaders = map[string]ManifestLoader{
-	"go.mod":           LoadGoModManifest,
-	"package.json":     LoadPackageJsonManifest,
-	"requirements.txt": LoadRequirementsManifest,
+	"CMakeLists.txt":   LoadCMakeManifest,
 	"Cargo.toml":       LoadCargoManifest,
+	"Gemfile":          LoadGemfileManifest,
+	"bun.lock":         LoadBunLockManifest,
+	"composer.json":    LoadComposerManifest,
+	"deno.json":        LoadDenoManifest,
+	"deno.jsonc":       LoadDenoManifest,
+	"go.mod":           LoadGoModManifest,
+	"go.work":          LoadGoWorkManifest,
+	"package.json":     LoadPackageJsonManifest,
+	"pubspec.yaml":     LoadPubspecManifest,
 	"pyproject.toml":   LoadPyprojectManifest,
+	"requirements.txt": LoadRequirementsManifest,
 }
 
 var ProjectIdentifiers = []ProjectIdentifier{
@@ -173,11 +189,19 @@ func CollectManifestFlags(path string, subfiles []string) ([]string, error) {
 	return flags, nil
 }
 
-func CollectManifestDependencies(root string) ([]string, error) {
+func CollectManifestDependencies(root string, settings ManifestDepsSettings) ([]string, error) {
 	dependencies := make([]string, 0)
 	for _, fileName := range ManifestLoaderFileNames() {
 		manifestPath := filepath.Join(root, fileName)
-		_, entries, loaded, err := ManifestLoaders[fileName](root, manifestPath)
+		var entries []string
+		var loaded bool
+		var err error
+
+		if fileName == "go.mod" {
+			_, entries, loaded, err = loadGoModManifest(root, manifestPath, settings)
+		} else {
+			_, entries, loaded, err = ManifestLoaders[fileName](root, manifestPath)
+		}
 		if err != nil {
 			return nil, err
 		}

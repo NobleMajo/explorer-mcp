@@ -171,7 +171,7 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		return "", err
 	}
 
-	dependencies, err := runSection("dependencies", settings.disableDependenciesOverview, deps.DepsOverview)
+	dependencies, err := runSection("dependencies", settings.disableDependenciesOverview, deps.DepsOverview(deps.Settings{ShowGoToolDeps: settings.showGoToolDeps}))
 	if err != nil {
 		return "", err
 	}

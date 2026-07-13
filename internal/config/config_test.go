@@ -244,6 +244,43 @@ func TestParseConfigEnableOpencodeOverviewEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigShowGoToolDepsFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-K=false"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.ShowGoToolDeps {
+		t.Fatal("expected ShowGoToolDeps false when -K=false")
+	}
+}
+
+func TestParseConfigShowGoToolDepsDefault(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.ShowGoToolDeps {
+		t.Fatal("expected ShowGoToolDeps true by default")
+	}
+}
+
+func TestParseConfigShowGoToolDepsEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("SHOW_GO_TOOL_DEPS", "false")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.ShowGoToolDeps {
+		t.Fatal("expected SHOW_GO_TOOL_DEPS env to disable go tool deps")
+	}
+}
+
 func TestParseConfigExploreFlagsBeforePrint(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })

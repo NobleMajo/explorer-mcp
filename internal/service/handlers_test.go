@@ -323,7 +323,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "deps with ecosystems",
 			domain: "deps",
 			sect: exploreSections{
-				dependencies: mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
+				dependencies: mustRawJSON(t, []string{"demo@1.0.0 direct"}),
 			},
 			want: true,
 		},
@@ -502,7 +502,7 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 		structure:     mustRawJSON(t, map[string]any{"projectScanDepthLimit": 6, "entryCount": 1}),
 		git:       mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
 		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
-		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
+		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 direct"}),
 		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
 		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make-targets": []string{"build"}}}),
 		cli:        mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
@@ -1182,6 +1182,130 @@ func TestBuildExploreResponseCollapsesProjectScanDirs(t *testing.T) {
 	}
 }
 
+func TestBuildExploreResponseIncludesGoToolDeps(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/go.mod", `module demo
+
+require golang.org/x/tools v0.30.0
+
+tool golang.org/x/tools/cmd/goimports
+`)
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		showGoToolDeps: true,
+		projectScanDepth: 6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp exploreResponse
+	testutil.ParseJSON(t, jsonText, &resp)
+
+	var deps []string
+	if err := json.Unmarshal(resp.Dependencies, &deps); err != nil {
+		t.Fatalf("unmarshal dependencies: %v", err)
+	}
+	for _, want := range []string{
+		"golang.org/x/tools@v0.30.0 direct",
+		"golang.org/x/tools/cmd/goimports@v0.30.0 tool",
+	} {
+		if !slices.Contains(deps, want) {
+			t.Fatalf("missing dependency %q, got %v", want, deps)
+		}
+	}
+}
+
+func TestBuildExploreResponseHidesGoToolDepsWhenDisabled(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/go.mod", `module demo
+
+require golang.org/x/tools v0.30.0
+
+tool golang.org/x/tools/cmd/goimports
+`)
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		showGoToolDeps: false,
+		projectScanDepth: 6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp exploreResponse
+	testutil.ParseJSON(t, jsonText, &resp)
+
+	var deps []string
+	if err := json.Unmarshal(resp.Dependencies, &deps); err != nil {
+		t.Fatalf("unmarshal dependencies: %v", err)
+	}
+	if !slices.Contains(deps, "golang.org/x/tools@v0.30.0 direct") {
+		t.Fatalf("missing require dependency, got %v", deps)
+	}
+	for _, entry := range deps {
+		if strings.HasSuffix(entry, " tool") {
+			t.Fatalf("expected tool deps hidden, got %v", deps)
+		}
+	}
+}
+
+func TestBuildExploreResponseUsesStandardDependencyScopes(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/go.mod", `module demo
+
+require github.com/indirect/dep v0.1.0 // indirect
+
+tool golang.org/x/tools/cmd/goimports
+`)
+	testutil.WriteFile(t, root+"/package.json", `{"dependencies":{"alpha":"1.0.0"},"devDependencies":{"eslint":"9.0.0"}}`)
+	testutil.WriteFile(t, root+"/bun.lock", `{
+  "workspaces": { "": { "dependencies": { "zod": "^4.1.12" } } },
+  "packages": {
+    "zod": ["zod@4.1.12", "", {}, "hash"],
+    "left-pad": ["left-pad@1.0.0", "", {}, "hash"]
+  }
+}`)
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		showGoToolDeps:   true,
+		projectScanDepth: 6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp exploreResponse
+	testutil.ParseJSON(t, jsonText, &resp)
+
+	var deps []string
+	if err := json.Unmarshal(resp.Dependencies, &deps); err != nil {
+		t.Fatalf("unmarshal dependencies: %v", err)
+	}
+
+	for _, want := range []string{
+		"github.com/indirect/dep@v0.1.0 indirect",
+		"golang.org/x/tools/cmd/goimports tool",
+		"alpha@1.0.0 direct",
+		"eslint@9.0.0 dev",
+		"zod@^4.1.12 direct",
+		"left-pad@1.0.0 indirect",
+	} {
+		if !slices.Contains(deps, want) {
+			t.Fatalf("missing dependency %q, got %v", want, deps)
+		}
+	}
+
+	for _, entry := range deps {
+		if strings.HasSuffix(entry, " production") || strings.HasSuffix(entry, " development") || strings.Contains(entry, "@direct") || strings.Contains(entry, "@indirect") {
+			t.Fatalf("legacy scope label in %q", entry)
+		}
+	}
+}
+
 const testProjectScanDepthForHandlers = 7
 
 func testExploreSettingsAllSections(verbose bool) exploreSettings {
@@ -1189,7 +1313,8 @@ func testExploreSettingsAllSections(verbose bool) exploreSettings {
 		verbose:                     verbose,
 		recentCommitCount:           10,
 		parentScanDepth:             3,
-		projectScanDepth:               7,
+		projectScanDepth:            7,
+		showGoToolDeps:              true,
 		enableCliOverview:           true,
 		enableOpencodeOverview:      true,
 		enableBehaviorInstruction:   true,

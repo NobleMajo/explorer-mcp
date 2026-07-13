@@ -10,6 +10,10 @@ import (
 )
 
 func LoadGoModManifest(root, manifestPath string) (string, []string, bool, error) {
+	return loadGoModManifest(root, manifestPath, DefaultManifestDepsSettings())
+}
+
+func loadGoModManifest(root, manifestPath string, settings ManifestDepsSettings) (string, []string, bool, error) {
 	_ = root
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -19,7 +23,7 @@ func LoadGoModManifest(root, manifestPath string) (string, []string, bool, error
 		return "", nil, false, err
 	}
 
-	return "@go", parseGoModRequire(string(data)), true, nil
+	return "@go", parseGoModDependencies(string(data), settings), true, nil
 }
 
 func LoadPackageJsonManifest(root, manifestPath string) (string, []string, bool, error) {
@@ -42,10 +46,10 @@ func LoadPackageJsonManifest(root, manifestPath string) (string, []string, bool,
 
 	entries := make([]string, 0, len(pkg.Dependencies)+len(pkg.DevDependencies))
 	for name, version := range pkg.Dependencies {
-		entries = append(entries, formatNodeDependency(name, version, "production"))
+		entries = append(entries, formatScopedDependency(name, version, DepScopeDirect))
 	}
 	for name, version := range pkg.DevDependencies {
-		entries = append(entries, formatNodeDependency(name, version, "development"))
+		entries = append(entries, formatScopedDependency(name, version, DepScopeDev))
 	}
 
 	sort.Strings(entries)
@@ -109,15 +113,11 @@ func LoadPyprojectManifest(root, manifestPath string) (string, []string, bool, e
 }
 
 func formatGoModuleDependency(name, version string, indirect bool) string {
-	scope := "@direct"
+	scope := DepScopeDirect
 	if indirect {
-		scope = "@indirect"
+		scope = DepScopeIndirect
 	}
-	return name + "@" + version + " " + scope
-}
-
-func formatNodeDependency(name, version, scope string) string {
-	return name + "@" + version + " " + scope
+	return formatScopedDependency(name, version, scope)
 }
 
 func formatPythonDependency(line string) string {
@@ -126,10 +126,154 @@ func formatPythonDependency(line string) string {
 		if idx := strings.Index(line, op); idx > 0 {
 			name := strings.TrimSpace(line[:idx])
 			constraint := strings.TrimSpace(line[idx:])
-			return name + "@" + constraint
+			return formatScopedDependency(name, constraint, DepScopeDirect)
 		}
 	}
-	return strings.TrimSpace(line)
+	return formatScopedDependency(strings.TrimSpace(line), "", DepScopeDirect)
+}
+
+func parseGoModDependencies(content string, settings ManifestDepsSettings) []string {
+	entries := parseGoModRequire(content)
+	if !settings.ShowGoToolDeps {
+		return entries
+	}
+
+	requireVersions := parseGoModRequireVersions(content)
+	toolEntries := parseGoModTool(content, requireVersions)
+	if len(toolEntries) == 0 {
+		return entries
+	}
+
+	seen := make(map[string]struct{}, len(entries)+len(toolEntries))
+	merged := make([]string, 0, len(entries)+len(toolEntries))
+	for _, entry := range entries {
+		if _, ok := seen[entry]; ok {
+			continue
+		}
+		seen[entry] = struct{}{}
+		merged = append(merged, entry)
+	}
+	for _, entry := range toolEntries {
+		if _, ok := seen[entry]; ok {
+			continue
+		}
+		seen[entry] = struct{}{}
+		merged = append(merged, entry)
+	}
+
+	sort.Strings(merged)
+	return merged
+}
+
+func parseGoModRequireVersions(content string) map[string]string {
+	lines := strings.Split(content, "\n")
+	inBlock := false
+	versions := make(map[string]string)
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "require (") {
+			inBlock = true
+			continue
+		}
+		if inBlock && trimmed == ")" {
+			inBlock = false
+			continue
+		}
+
+		if inBlock {
+			if mod, version, ok := parseGoModRequireFields(trimmed); ok {
+				versions[mod] = version
+			}
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "require ") {
+			if mod, version, ok := parseGoModRequireFields(strings.TrimPrefix(trimmed, "require ")); ok {
+				versions[mod] = version
+			}
+		}
+	}
+
+	return versions
+}
+
+func parseGoModTool(content string, requireVersions map[string]string) []string {
+	lines := strings.Split(content, "\n")
+	inBlock := false
+	entries := make([]string, 0)
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "//") {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "tool (") {
+			inBlock = true
+			continue
+		}
+		if inBlock && trimmed == ")" {
+			inBlock = false
+			continue
+		}
+
+		if inBlock {
+			if entry, ok := parseGoModToolLine(trimmed, requireVersions); ok {
+				entries = append(entries, entry)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "tool ") {
+			if entry, ok := parseGoModToolLine(strings.TrimPrefix(trimmed, "tool "), requireVersions); ok {
+				entries = append(entries, entry)
+			}
+		}
+	}
+
+	sort.Strings(entries)
+	return entries
+}
+
+func parseGoModToolLine(line string, requireVersions map[string]string) (string, bool) {
+	line = strings.Split(line, "//")[0]
+	toolPath := strings.TrimSpace(strings.Trim(line, ","))
+	if toolPath == "" {
+		return "", false
+	}
+
+	version := lookupGoModToolVersion(toolPath, requireVersions)
+	return formatScopedDependency(toolPath, version, DepScopeTool), true
+}
+
+func lookupGoModToolVersion(toolPath string, requireVersions map[string]string) string {
+	bestModule := ""
+	for modulePath, version := range requireVersions {
+		if toolPath == modulePath || strings.HasPrefix(toolPath, modulePath+"/") {
+			if len(modulePath) > len(bestModule) {
+				bestModule = modulePath
+				_ = version
+			}
+		}
+	}
+	if bestModule == "" {
+		return ""
+	}
+	return requireVersions[bestModule]
+}
+
+func parseGoModRequireFields(line string) (string, string, bool) {
+	line = strings.Split(line, "//")[0]
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) < 2 {
+		return "", "", false
+	}
+	return fields[0], fields[1], true
 }
 
 func parseGoModRequire(content string) []string {

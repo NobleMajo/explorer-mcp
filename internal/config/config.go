@@ -23,6 +23,8 @@ type AppConfig struct {
 	ProjectScanDepsDirs bool
 	ProjectScanDepth    int
 
+	ShowGoToolDeps bool
+
 	DisableStructureOverview    bool
 	DisableGitOverview          bool
 	DisableWorkspaceOverview    bool
@@ -50,6 +52,8 @@ func defaultAppConfig() *AppConfig {
 		ProjectScanOutDirs:  false,
 		ProjectScanDepsDirs: false,
 		ProjectScanDepth:    6,
+
+		ShowGoToolDeps: true,
 
 		DisableStructureOverview:    false,
 		DisableGitOverview:          false,
@@ -116,6 +120,9 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsBool("PROJECT_SCAN_DEPS_DIRS", func(value bool) {
 		appConfig.ProjectScanDepsDirs = value
 	})
+	EnvIsBool("SHOW_GO_TOOL_DEPS", func(value bool) {
+		appConfig.ShowGoToolDeps = value
+	})
 	EnvIsBool("DISABLE_STRUCTURE_OVERVIEW", func(value bool) {
 		appConfig.DisableStructureOverview = value
 	})
@@ -154,6 +161,7 @@ func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().IntVarP(&appConfig.ProjectScanDepth, "project-scan-depth", "d", appConfig.ProjectScanDepth, "project structure scan depth (PROJECT_SCAN_DEPTH)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.ProjectScanOutDirs, "project-scan-out-dirs", "U", appConfig.ProjectScanOutDirs, "include dist, out and output directories in structure scan (PROJECT_SCAN_OUT_DIRS)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.ProjectScanDepsDirs, "project-scan-deps-dirs", "J", appConfig.ProjectScanDepsDirs, "include node_modules and vendor directories in structure scan (PROJECT_SCAN_DEPS_DIRS)")
+	cmd.PersistentFlags().BoolVarP(&appConfig.ShowGoToolDeps, "show-go-tool-deps", "K", appConfig.ShowGoToolDeps, "label go.mod tool dependencies separately in dependencies overview (SHOW_GO_TOOL_DEPS)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableStructureOverview, "disable-structure", "S", appConfig.DisableStructureOverview, "omit structure overview (DISABLE_STRUCTURE_OVERVIEW)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableGitOverview, "disable-git", "G", appConfig.DisableGitOverview, "omit git overview (DISABLE_GIT_OVERVIEW)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.DisableWorkspaceOverview, "disable-workspace", "W", appConfig.DisableWorkspaceOverview, "omit workspace overview (DISABLE_WORKSPACE_OVERVIEW)")

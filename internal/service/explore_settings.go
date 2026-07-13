@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/NobleMajo/explorer-mcp/internal/config"
+	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/parent"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/structure"
 )
@@ -19,6 +20,7 @@ type exploreSettings struct {
 	projectScanDepth            int
 	projectScanOutDirs          bool
 	projectScanDepsDirs         bool
+	showGoToolDeps              bool
 	enableBehaviorInstruction   bool
 	disableStructureOverview    bool
 	disableGitOverview          bool
@@ -32,7 +34,9 @@ type exploreSettings struct {
 
 func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
 	if cfg == nil {
-		return exploreSettings{}
+		return exploreSettings{
+			showGoToolDeps: true,
+		}
 	}
 
 	return exploreSettings{
@@ -44,6 +48,7 @@ func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
 		projectScanDepth:            cfg.ProjectScanDepth,
 		projectScanOutDirs:          cfg.ProjectScanOutDirs,
 		projectScanDepsDirs:         cfg.ProjectScanDepsDirs,
+		showGoToolDeps:              cfg.ShowGoToolDeps,
 		enableBehaviorInstruction:   cfg.EnableBehaviorInstruction,
 		disableStructureOverview:    cfg.DisableStructureOverview,
 		disableGitOverview:          cfg.DisableGitOverview,
@@ -62,6 +67,10 @@ func (s exploreSettings) parentScanSettings() parent.ScanSettings {
 		ScanDotDirs: s.parentScanDotDirs,
 		ScanHomeDir: s.parentScanHomeDir,
 	}
+}
+
+func (s exploreSettings) manifestDepsSettings() globals.ManifestDepsSettings {
+	return globals.ManifestDepsSettings{ShowGoToolDeps: s.showGoToolDeps}
 }
 
 func (s exploreSettings) projectScanSettings() structure.ScanSettings {

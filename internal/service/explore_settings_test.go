@@ -91,6 +91,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		ProjectScanDepth:            3,
 		ProjectScanOutDirs:          true,
 		ProjectScanDepsDirs:         true,
+		ShowGoToolDeps:              false,
 		EnableBehaviorInstruction:   true,
 		DisableStructureOverview:    true,
 		DisableGitOverview:          true,
@@ -111,6 +112,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.projectScanDepth != cfg.ProjectScanDepth ||
 		settings.projectScanOutDirs != cfg.ProjectScanOutDirs ||
 		settings.projectScanDepsDirs != cfg.ProjectScanDepsDirs ||
+		settings.showGoToolDeps != cfg.ShowGoToolDeps ||
 		settings.enableBehaviorInstruction != cfg.EnableBehaviorInstruction ||
 		settings.disableStructureOverview != cfg.DisableStructureOverview ||
 		settings.disableGitOverview != cfg.DisableGitOverview ||
@@ -128,6 +130,9 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 	}
 	if settings.projectScanSettings().Depth != cfg.ProjectScanDepth {
 		t.Fatalf("projectScanSettings().Depth = %d, want %d", settings.projectScanSettings().Depth, cfg.ProjectScanDepth)
+	}
+	if settings.manifestDepsSettings().ShowGoToolDeps != cfg.ShowGoToolDeps {
+		t.Fatalf("manifestDepsSettings().ShowGoToolDeps = %v, want %v", settings.manifestDepsSettings().ShowGoToolDeps, cfg.ShowGoToolDeps)
 	}
 }
 
@@ -160,5 +165,8 @@ func TestExploreSettingsFromConfigNil(t *testing.T) {
 	}
 	if settings.enableOpencodeOverview {
 		t.Fatal("expected opencode disabled by default")
+	}
+	if !settings.showGoToolDeps {
+		t.Fatal("expected showGoToolDeps true for nil config")
 	}
 }

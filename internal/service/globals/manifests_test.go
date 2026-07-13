@@ -3,6 +3,7 @@ package globals
 import (
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
@@ -28,9 +29,9 @@ require github.com/single/dep v9.9.9
 	}
 
 	want := []string{
-		"github.com/foo/bar@v1.2.3 @direct",
-		"github.com/indirect/dep@v0.1.0 @indirect",
-		"github.com/single/dep@v9.9.9 @direct",
+		"github.com/foo/bar@v1.2.3 direct",
+		"github.com/indirect/dep@v0.1.0 indirect",
+		"github.com/single/dep@v9.9.9 direct",
 	}
 	for _, entry := range want {
 		if !slices.Contains(deps, entry) {
@@ -65,6 +66,79 @@ func TestParseGoModRequireLineInvalid(t *testing.T) {
 	_, ok := parseGoModRequireLine("incomplete")
 	if ok {
 		t.Fatal("expected invalid require line to fail")
+	}
+}
+
+func TestParseGoModTool(t *testing.T) {
+	t.Parallel()
+
+	content := `module demo
+
+require golang.org/x/tools v0.30.0
+
+tool (
+	golang.org/x/tools/cmd/goimports
+)
+
+tool github.com/golangci/golangci-lint/cmd/golangci-lint
+`
+	versions := parseGoModRequireVersions(content)
+	got := parseGoModTool(content, versions)
+	want := []string{
+		"golang.org/x/tools/cmd/goimports@v0.30.0 tool",
+		"github.com/golangci/golangci-lint/cmd/golangci-lint tool",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("parseGoModTool() = %v, want %v", got, want)
+	}
+	for _, entry := range want {
+		if !slices.Contains(got, entry) {
+			t.Fatalf("missing %q in %v", entry, got)
+		}
+	}
+}
+
+func TestParseGoModDependenciesHidesToolDepsWhenDisabled(t *testing.T) {
+	t.Parallel()
+
+	content := `module demo
+
+require golang.org/x/tools v0.30.0
+
+tool golang.org/x/tools/cmd/goimports
+`
+	got := parseGoModDependencies(content, ManifestDepsSettings{ShowGoToolDeps: false})
+	for _, entry := range got {
+		if strings.HasSuffix(entry, " tool") {
+			t.Fatalf("unexpected tool dependency %q", entry)
+		}
+	}
+	if len(got) != 1 || got[0] != "golang.org/x/tools@v0.30.0 direct" {
+		t.Fatalf("unexpected result: %v", got)
+	}
+}
+
+func TestLoadGoModManifestIncludesToolDepsByDefault(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	path := filepath.Join(root, "go.mod")
+	testutil.WriteFile(t, path, `module demo
+
+require golang.org/x/tools v0.30.0
+
+tool golang.org/x/tools/cmd/goimports
+`)
+
+	tag, got, loaded, err := LoadGoModManifest(root, path)
+	if err != nil {
+		t.Fatalf("LoadGoModManifest() error: %v", err)
+	}
+	if !loaded || tag != "@go" {
+		t.Fatalf("loaded=%v tag=%q, want loaded true tag @go", loaded, tag)
+	}
+	if !slices.Contains(got, "golang.org/x/tools/cmd/goimports@v0.30.0 tool") {
+		t.Fatalf("missing tool dependency, got %v", got)
 	}
 }
 
@@ -125,7 +199,7 @@ func TestLoadGoModManifest(t *testing.T) {
 	if tag != "@go" {
 		t.Fatalf("tag = %q, want @go", tag)
 	}
-	if len(got) != 1 || got[0] != "github.com/foo/bar@v1.0.0 @direct" {
+	if len(got) != 1 || got[0] != "github.com/foo/bar@v1.0.0 direct" {
 		t.Fatalf("unexpected result: %v", got)
 	}
 }
@@ -147,7 +221,7 @@ func TestLoadPackageJsonManifest(t *testing.T) {
 	if tag != "@npm" {
 		t.Fatalf("tag = %q, want @npm", tag)
 	}
-	want := []string{"alpha@1.0.0 production", "eslint@9.0.0 development"}
+	want := []string{"alpha@1.0.0 direct", "eslint@9.0.0 dev"}
 	if len(got) != len(want) {
 		t.Fatalf("unexpected result: %v", got)
 	}
@@ -175,7 +249,7 @@ func TestLoadRequirementsManifest(t *testing.T) {
 	if tag != "@pip" {
 		t.Fatalf("tag = %q, want @pip", tag)
 	}
-	want := []string{"flask@>=3.0.0", "requests@==2.28.0"}
+	want := []string{"flask@>=3.0.0 direct", "requests@==2.28.0 direct"}
 	if len(got) != len(want) {
 		t.Fatalf("unexpected result: %v", got)
 	}
@@ -215,7 +289,7 @@ func TestLoadRequirementsManifestInlineComment(t *testing.T) {
 	if tag != "@pip" {
 		t.Fatalf("tag = %q, want @pip", tag)
 	}
-	if len(got) != 1 || got[0] != "requests@==2.28.0" {
+	if len(got) != 1 || got[0] != "requests@==2.28.0 direct" {
 		t.Fatalf("unexpected result: %v", got)
 	}
 }
@@ -237,7 +311,7 @@ func TestLoadRequirementsManifestPlainPackageName(t *testing.T) {
 	if tag != "@pip" {
 		t.Fatalf("tag = %q, want @pip", tag)
 	}
-	if len(got) != 1 || got[0] != "requests" {
+	if len(got) != 1 || got[0] != "requests direct" {
 		t.Fatalf("unexpected result: %v", got)
 	}
 }
