@@ -8,10 +8,13 @@
 
 explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
 
-Use `explorer-mcp print` to dump the same JSON the MCP `explore` tool returns.
+Use `explorer-mcp print [projectRootPath]` to dump the same JSON the MCP `explore` tool returns.
 
 # Table of Contents
 - [Explore response design](#explore-response-design)
+- [Explore resources](#explore-resources)
+  - [Enabled by default](#enabled-by-default)
+  - [Opt-in](#opt-in)
 - [Requirements](#requirements)
 - [Getting Started](#getting-started-1)
 - [Install via go](#install-via-go)
@@ -25,16 +28,37 @@ Use `explorer-mcp print` to dump the same JSON the MCP `explore` tool returns.
 
 The `explore` JSON follows a few consistent rules:
 
-- **Only show what is there** — lists and maps use `omitempty`; empty arrays are omitted when a scan ran but found nothing.
-- **Do not show what is not found** — whole sections are omitted when disabled by flag or when prerequisites are missing (e.g. no `git` binary, not a git repo, no container CLI).
-- **Combine details into string arrays** — dependencies, container rows, git status lines, and sibling paths are compact encoded strings instead of nested objects.
-- **Use small flags for metadata** — booleans like `parentScanPerformed`, `recentCommitsListed`, and `repoScanDepthLimit` tell the agent whether a scan ran vs. what was found.
-- **Behavior hints follow data** — `agentBehaviorInstructions` only includes domains whose section is present and non-empty; use `-B` / `--enable-behavior` to include behavior text.
-- **At least one overview required** — if every overview is disabled, `print` and `explore` return an error.
+- **Only show what is there**: lists and maps use `omitempty`; empty arrays are omitted when a scan ran but found nothing.
+- **Do not show what is not found**: whole sections are omitted when disabled by flag or when prerequisites are missing (e.g. no `git` binary, not a git repo, no container CLI).
+- **Combine details into string arrays**: dependencies, container rows, git status lines, and sibling paths are compact encoded strings instead of nested objects.
+- **Use small flags for metadata**: booleans like `parentScanPerformed`, `recentCommitsListed`, and `repoScanDepthLimit` tell the agent whether a scan ran vs. what was found.
+- **Behavior hints follow data**: `agentBehaviorInstructions` only includes domains whose section is present and non-empty; use `-B` / `--enable-behavior` to include behavior text.
+- **At least one explore resource required**: if every explore resource is disabled, `print` and `explore` return an error.
 
 Depth/count flags (`-c`, `-p`, `-d`) control how much is collected; disable flags (`-S`, `-G`, …) skip entire sections.
+MCP note: the `explore` tool requires a **mandatory** input parameter `projectRootPath` (absolute or relative path to project root directory). The path is validated and passed through to all explore resource collectors.
 
-More flags via:
+## Explore resources
+
+Sections can be enabled or disabled via CLI flags and environment variables. See `explorer-mcp -h` or `explorer-mcp print -h`.
+Some sections are omitted at runtime when prerequisites are missing (no git repo, no container CLI, no `opencode` binary, etc.).
+
+### Enabled by default
+
+- **structure**: File tree under `projectRootPath` up to scan depth; relative paths, `/**` for truncated dirs
+- **git**: Branch or detached head, dirty files, recent commits, diffstat
+- **workspace**: Parent and sibling projects around `projectRootPath`
+- **dependencies**: Dependencies from manifests (`go.mod`, `package.json`, `requirements.txt`, …)
+- **container**: Container CLIs in PATH and running containers linked to the project
+- **tools**: Makefile targets, `package.json` scripts, root shell scripts<!--  -->
+
+### Opt-in
+
+- **cli**: Common CLI tools available in PATH. This could mislead an AI agent and cause complications. 
+- **opencode**: Effective OpenCode permission rules and MCP server names via `opencode debug agent build`
+- **behavior**: `agentBehaviorMainInstruction` and per-domain `agentBehaviorInstructions` for present sections
+
+Quick help:
 ```sh
 go run github.com/NobleMajo/explorer-mcp@latest -h
 ```
@@ -43,7 +67,6 @@ Example output for current working dir:
 ```sh
 go run github.com/NobleMajo/explorer-mcp@latest print
 ```
-
 
 # Getting Started
 
