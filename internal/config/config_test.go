@@ -17,6 +17,24 @@ func TestParseConfigPrintCommand(t *testing.T) {
 	}
 }
 
+func TestParseConfigParentScanFlags(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "-D", "-H"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.PrintAll {
+		t.Fatal("expected PrintAll true")
+	}
+	if !cfg.ParentScanDotDirs {
+		t.Fatal("expected ParentScanDotDirs true")
+	}
+	if !cfg.ParentScanHomeDir {
+		t.Fatal("expected ParentScanHomeDir true")
+	}
+}
+
 func TestParseConfigPrintExploreFlags(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
@@ -26,7 +44,7 @@ func TestParseConfigPrintExploreFlags(t *testing.T) {
 		"-c", "0",
 		"-p", "1",
 		"-d", "2",
-		"-n",
+		"-N",
 	}
 	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
 

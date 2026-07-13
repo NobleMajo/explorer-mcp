@@ -37,7 +37,7 @@ func TestWorkspaceContext(t *testing.T) {
 	}
 	testutil.Chdir(t, current)
 
-	result, err := ParentOverview(1)()(false)
+	result, err := ParentOverview(ScanSettings{Depth: 1})()(false)
 	if err != nil {
 		t.Fatalf("ParentOverview() error: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestWorkspaceContextSkipsParentScanAtDepthZero(t *testing.T) {
 	}
 	testutil.Chdir(t, current)
 
-	result, err := ParentOverview(0)()(false)
+	result, err := ParentOverview(ScanSettings{Depth: 0})()(false)
 	if err != nil {
 		t.Fatalf("ParentOverview() error: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestWorkspaceContextUnreadableParent(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = os.Chmod(parent, 0o755) })
 
-	_, err := ParentOverview(1)()(false)
+	_, err := ParentOverview(ScanSettings{Depth: 1})()(false)
 	if err == nil {
 		t.Fatal("expected error when parent directory is unreadable")
 	}

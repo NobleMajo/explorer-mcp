@@ -10,6 +10,10 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
+func scanSettings(depth int) ScanSettings {
+	return ScanSettings{Depth: depth}
+}
+
 func TestListParentProjectsDepthOne(t *testing.T) {
 	parent := t.TempDir()
 	current := filepath.Join(parent, "app")
@@ -20,7 +24,7 @@ func TestListParentProjectsDepthOne(t *testing.T) {
 	}
 	testutil.WriteFile(t, filepath.Join(parent, "notes.txt"), "ignore\n")
 
-	siblings, err := listParentProjects(current, 1)
+	siblings, err := listParentProjects(current, scanSettings(1))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -43,7 +47,7 @@ func TestListParentProjectsDepthTwo(t *testing.T) {
 		}
 	}
 
-	siblings, err := listParentProjects(current, 2)
+	siblings, err := listParentProjects(current, scanSettings(2))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -71,7 +75,7 @@ func TestListParentProjectsDepthThreeIncludesGitRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	siblings, err := listParentProjects(current, 3)
+	siblings, err := listParentProjects(current, scanSettings(3))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -103,7 +107,7 @@ func TestListParentProjectsSkipsNestedDirsWhenFlagged(t *testing.T) {
 		}
 	}
 
-	siblings, err := listParentProjects(current, 3)
+	siblings, err := listParentProjects(current, scanSettings(3))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -131,7 +135,7 @@ func TestListParentProjectsSkipsNestedDirsForMakefileProject(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	siblings, err := listParentProjects(current, 3)
+	siblings, err := listParentProjects(current, scanSettings(3))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -154,7 +158,7 @@ func TestListParentProjectsSkipsCurrentProjectSubtree(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	siblings, err := listParentProjects(current, 2)
+	siblings, err := listParentProjects(current, scanSettings(2))
 	if err != nil {
 		t.Fatalf("listParentProjects() error: %v", err)
 	}
@@ -167,8 +171,139 @@ func TestListParentProjectsSkipsCurrentProjectSubtree(t *testing.T) {
 }
 
 func TestListParentProjectsMissingStartDir(t *testing.T) {
-	_, err := listParentProjects("/does/not/exist", 1)
+	_, err := listParentProjects("/does/not/exist", scanSettings(1))
 	if err == nil {
 		t.Fatal("expected error for missing start directory")
+	}
+}
+
+func TestListParentProjectsSkipsDotDirsByDefault(t *testing.T) {
+	root := t.TempDir()
+	current := filepath.Join(root, "app")
+	dotSibling := filepath.Join(root, ".config")
+	visibleSibling := filepath.Join(root, "visible")
+	for _, dir := range []string{current, dotSibling, visibleSibling} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	siblings, err := listParentProjects(current, ScanSettings{Depth: 1})
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	if !slices.ContainsFunc(siblings, func(entry string) bool {
+		return siblingRelativePath(entry) == "../visible"
+	}) {
+		t.Fatalf("missing ../visible in siblings %v", siblings)
+	}
+	for _, entry := range siblings {
+		if strings.Contains(siblingRelativePath(entry), ".config") {
+			t.Fatalf("expected dot dir skipped, got %q", entry)
+		}
+	}
+}
+
+func TestListParentProjectsIncludesDotDirsWithFlag(t *testing.T) {
+	root := t.TempDir()
+	current := filepath.Join(root, "app")
+	dotSibling := filepath.Join(root, ".config")
+	if err := os.MkdirAll(current, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dotSibling, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	siblings, err := listParentProjects(current, ScanSettings{Depth: 1, ScanDotDirs: true})
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	if !slices.ContainsFunc(siblings, func(entry string) bool {
+		return siblingRelativePath(entry) == "../.config"
+	}) {
+		t.Fatalf("missing ../.config in siblings %v", siblings)
+	}
+}
+
+func TestListParentProjectsStopsAtHomeByDefault(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home", "user")
+	current := filepath.Join(home, "ws", "app")
+	homeSibling := filepath.Join(home, "other")
+	wsSibling := filepath.Join(home, "ws", "sib")
+	for _, dir := range []string{current, homeSibling, wsSibling} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	siblings, err := listParentProjects(current, ScanSettings{
+		Depth:   3,
+		HomeDir: home,
+	})
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	if !slices.ContainsFunc(siblings, func(entry string) bool {
+		return siblingRelativePath(entry) == "../sib"
+	}) {
+		t.Fatalf("missing ../sib in siblings %v", siblings)
+	}
+	for _, entry := range siblings {
+		rel := siblingRelativePath(entry)
+		if rel == "../../other" || strings.HasPrefix(rel, "../../other/") {
+			t.Fatalf("expected home scan to stop before listing %q", rel)
+		}
+	}
+}
+
+func TestListParentProjectsScansHomeWithFlag(t *testing.T) {
+	root := t.TempDir()
+	home := filepath.Join(root, "home", "user")
+	current := filepath.Join(home, "ws", "app")
+	homeSibling := filepath.Join(home, "other")
+	wsSibling := filepath.Join(home, "ws", "sib")
+	for _, dir := range []string{current, homeSibling, wsSibling} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	siblings, err := listParentProjects(current, ScanSettings{
+		Depth:       3,
+		ScanHomeDir: true,
+		HomeDir:     home,
+	})
+	if err != nil {
+		t.Fatalf("listParentProjects() error: %v", err)
+	}
+	for _, want := range []string{"../sib", "../../other"} {
+		if !slices.ContainsFunc(siblings, func(entry string) bool {
+			return siblingRelativePath(entry) == want
+		}) {
+			t.Fatalf("missing %q in siblings %v", want, siblings)
+		}
+	}
+}
+
+func TestShouldStopParentScanAtFilesystemRoot(t *testing.T) {
+	ctx := scanContext{settings: ScanSettings{Depth: 5}}
+	if !shouldStopParentScan("/", "/", ctx) {
+		t.Fatal("expected stop at filesystem root")
+	}
+	if !shouldStopParentScan("/", "/tmp", ctx) {
+		t.Fatal("expected stop before scanning from filesystem root")
+	}
+}
+
+func TestShouldStopParentScanAtHome(t *testing.T) {
+	home := filepath.Clean("/home/user")
+	ctx := scanContext{
+		settings: ScanSettings{Depth: 5, ScanHomeDir: false, HomeDir: home},
+		homeDir:  home,
+	}
+	if !shouldStopParentScan(home, filepath.Join(home, "ws", "app"), ctx) {
+		t.Fatal("expected stop at home directory boundary")
 	}
 }

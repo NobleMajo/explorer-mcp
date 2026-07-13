@@ -79,7 +79,7 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		return "", err
 	}
 
-	workspaceContext, err := overviewSection(parent.ParentOverview(settings.parentScanDepth), settings.verbose)
+	workspaceContext, err := overviewSection(parent.ParentOverview(settings.parentScanSettings()), settings.verbose)
 	if err != nil {
 		return "", err
 	}
