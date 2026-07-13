@@ -19,6 +19,7 @@ import (
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/structure"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/tools"
 	"github.com/NobleMajo/explorer-mcp/internal/service/resource"
+	"github.com/google/jsonschema-go/jsonschema"
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -34,14 +35,25 @@ var readOnlyToolAnnotations = &mcpsdk.ToolAnnotations{
 	ReadOnlyHint: true,
 }
 
+type exploreToolInput struct {
+	ProjectRootPath string `json:"projectRootPath" jsonschema:"absolute or relative path to project root directory"`
+}
+
+var exploreToolInputSchema = func() *jsonschema.Schema {
+	schema, err := jsonschema.For[exploreToolInput](nil)
+	if err != nil {
+		panic(fmt.Sprintf("explore tool input schema: %v", err))
+	}
+	return schema
+}()
+
 func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
 		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
-	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input struct {
-		ProjectRootPath string `json:"projectRootPath"`
-	}) (*mcpsdk.CallToolResult, any, error) {
+		InputSchema: exploreToolInputSchema,
+	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input exploreToolInput) (*mcpsdk.CallToolResult, any, error) {
 		start := time.Now()
 		if settings.verbose {
 			_, _ = fmt.Fprintf(os.Stderr, "explore: request begin\n")
