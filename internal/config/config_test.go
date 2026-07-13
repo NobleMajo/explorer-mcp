@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestParseConfigDirectOutFlag(t *testing.T) {
+func TestParseConfigPrintCommand(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
 
-	os.Args = []string{"explorer-mcp", "--out"}
+	os.Args = []string{"explorer-mcp", "print"}
 	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
-	if !cfg.DirectOut {
-		t.Fatal("expected DirectOut true")
+	if !cfg.PrintAll {
+		t.Fatal("expected PrintAll true")
 	}
 }
