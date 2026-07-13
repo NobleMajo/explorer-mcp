@@ -143,6 +143,12 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	if err := os.Chmod(dockerStub, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
+	opencodeStub := filepath.Join(binDir, "opencode")
+	testutil.WriteFile(t, opencodeStub, "#!/bin/sh\nif [ \"$1\" = debug ] && [ \"$2\" = agent ] && [ \"$3\" = build ]; then echo '{\"permission\":[{\"permission\":\"*\",\"pattern\":\"*\",\"action\":\"allow\"}],\"tools\":{\"bash\":true}}'; exit 0; fi\nexit 1\n")
+	if err := os.Chmod(opencodeStub, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
@@ -500,6 +506,8 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
 		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
 		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
+		cli:        mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
+		opencode:   mustRawJSON(t, map[string]any{"permissions": []string{"* '*':allow"}}),
 	}
 
 	instructions := buildAgentBehaviorInstructions(sections)
@@ -1121,6 +1129,7 @@ func testExploreSettingsAllSections(verbose bool) exploreSettings {
 		parentScanDepth:             3,
 		repoScanDepth:               7,
 		enableCliOverview:           true,
+		enableOpencodeOverview:      true,
 		enableBehaviorInstruction:   true,
 	}
 }
