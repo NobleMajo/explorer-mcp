@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -66,5 +67,24 @@ func TestParseConfigExploreFlagsBeforePrint(t *testing.T) {
 	}
 	if cfg.RepoScanDepth != 0 {
 		t.Fatalf("RepoScanDepth = %d, want 0", cfg.RepoScanDepth)
+	}
+}
+
+func TestParseConfigRejectsUnknownSubcommand(t *testing.T) {
+	if os.Getenv("TEST_PARSE_CONFIG_SUBCMD") == "1" {
+		os.Args = []string{"explorer-mcp", "help"}
+		ParseConfig("Demo", "demo", "1.0.0", "abc")
+		os.Exit(0)
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestParseConfigRejectsUnknownSubcommand$")
+	cmd.Env = append(os.Environ(), "TEST_PARSE_CONFIG_SUBCMD=1")
+	err := cmd.Run()
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok {
+		t.Fatalf("expected exit error, got %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1", exitErr.ExitCode())
 	}
 }

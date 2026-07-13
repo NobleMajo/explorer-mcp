@@ -10,7 +10,6 @@ import (
 type AppConfig struct {
 	Verbose     bool
 	ShowVersion bool
-	ShowHelp    bool
 	Args        []string
 
 	PrintAll bool
@@ -25,7 +24,6 @@ func defaultAppConfig() *AppConfig {
 	return &AppConfig{
 		Verbose:     false,
 		ShowVersion: false,
-		ShowHelp:    false,
 		Args:        []string{},
 
 		PrintAll: false,
@@ -101,7 +99,9 @@ func ParseConfig(
 		Use: shortName,
 		Short: displayName + " is a read-only MCP server for fast project context exploration.\n" +
 			"For more help, visit https://github.com/NobleMajo/explorer-mcp",
-		Run: func(cmd *cobra.Command, args []string) {},
+		Run: func(cmd *cobra.Command, args []string) {
+			appConfig.Args = args
+		},
 	}
 
 	rootCmd.PersistentFlags().BoolVarP(&appConfig.Verbose, "verbose", "b", appConfig.Verbose, "enable verbose mode (VERBOSE)")
@@ -116,6 +116,12 @@ func ParseConfig(
 		printCommand(appConfig),
 	)
 
+	// wanted behavior: shows an error when using the "help" subcommand and does not execute
+	rootCmd.SetHelpCommand(&cobra.Command{
+		Use:    "",
+		Hidden: true,
+	})
+
 	err := rootCmd.Execute()
 	if err != nil {
 		fmt.Println(err)
@@ -128,11 +134,6 @@ func ParseConfig(
 
 	if appConfig.ShowVersion {
 		fmt.Println(displayName + " version " + version + ", build " + commit)
-		os.Exit(0)
-	}
-
-	if appConfig.ShowHelp {
-		rootCmd.Help()
 		os.Exit(0)
 	}
 
