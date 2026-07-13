@@ -160,19 +160,20 @@ func TestExploreCombinesToolSections(t *testing.T) {
 		t.Fatalf("projectRootPath = %q, want %q", resp.ProjectRootPath, root)
 	}
 
-	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "repoScanDepthLimit")
-	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "rootPath")
-	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "projectRootPath")
-	assertSectionHasField(t, "gitOverview", resp.GitOverview, "isGitAvailable")
-	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "parentScanPerformed")
-	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "currentWorkingDirectoryPath")
-	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "parentDirectoryPath")
+	assertSectionHasField(t, "structure", resp.Structure, "repoScanDepthLimit")
+	assertSectionMissingField(t, "structure", resp.Structure, "rootPath")
+	assertSectionMissingField(t, "structure", resp.Structure, "projectRootPath")
+	assertSectionHasField(t, "git", resp.Git, "isGitAvailable")
+	assertSectionHasField(t, "workspace", resp.Workspace, "parentScanPerformed")
+	assertSectionMissingField(t, "workspace", resp.Workspace, "currentWorkingDirectoryPath")
+	assertSectionMissingField(t, "workspace", resp.Workspace, "parentDirectoryPath")
 	assertSectionIsJSONArray(t, "dependencies", resp.Dependencies)
-	assertSectionHasField(t, "containerOverview", resp.ContainerOverview, "detectedContainerFileCount")
-	assertSectionMissingField(t, "containerOverview", resp.ContainerOverview, "projectRootPath")
-	assertSectionHasField(t, "projectTools", resp.ProjectTools, "toolsFound")
-	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "projectRootPath")
-	assertSectionMissingField(t, "projectTools", resp.ProjectTools, "hasMakefile")
+	assertSectionHasField(t, "container", resp.Container, "cliFound")
+	assertSectionMissingField(t, "container", resp.Container, "projectRootPath")
+	assertSectionHasField(t, "tools", resp.Tools, "toolsFound")
+	assertSectionMissingField(t, "tools", resp.Tools, "projectRootPath")
+	assertSectionMissingField(t, "tools", resp.Tools, "hasMakefile")
+	assertSectionHasField(t, "cli", resp.CLI, "commonCliToolsFound")
 
 	if resp.AgentBehaviorMainInstruction != AgentBehaviorMainInstruction {
 		t.Fatalf("agentBehaviorMainInstruction = %q", resp.AgentBehaviorMainInstruction)
@@ -226,12 +227,12 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 	t.Parallel()
 
 	instructions := buildAgentBehaviorInstructions(exploreSections{
-		repoStructure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 0}),
-		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
+		structure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 0}),
+		git:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
+		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
 		dependencies:      mustRawJSON(t, []string{}),
-		containerOverview: mustRawJSON(t, map[string]any{}),
-		projectTools:      mustRawJSON(t, map[string]any{}),
+		container: mustRawJSON(t, map[string]any{}),
+		tools:      mustRawJSON(t, map[string]any{}),
 	})
 
 	if len(instructions) != 0 {
@@ -252,7 +253,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "structure with entries",
 			domain: "structure",
 			sect: exploreSections{
-				repoStructure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 2}),
+				structure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 2}),
 			},
 			want: true,
 		},
@@ -260,7 +261,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "structure empty",
 			domain: "structure",
 			sect: exploreSections{
-				repoStructure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 0}),
+				structure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 0}),
 			},
 			want: false,
 		},
@@ -268,7 +269,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "git repo",
 			domain: "git",
 			sect: exploreSections{
-				gitOverview: mustRawJSON(t, map[string]any{"isGitRepo": true}),
+				git: mustRawJSON(t, map[string]any{"isGitRepo": true}),
 			},
 			want: true,
 		},
@@ -276,7 +277,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "git not repo",
 			domain: "git",
 			sect: exploreSections{
-				gitOverview: mustRawJSON(t, map[string]any{"isGitRepo": false}),
+				git: mustRawJSON(t, map[string]any{"isGitRepo": false}),
 			},
 			want: false,
 		},
@@ -284,7 +285,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "parent with sibling",
 			domain: "parent",
 			sect: exploreSections{
-				workspaceContext: mustRawJSON(t, map[string]any{
+				workspace: mustRawJSON(t, map[string]any{
 					"parentScanPerformed": true,
 					"siblingProjects":     []string{"../other"},
 				}),
@@ -295,7 +296,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "parent only current",
 			domain: "parent",
 			sect: exploreSections{
-				workspaceContext: mustRawJSON(t, map[string]any{
+				workspace: mustRawJSON(t, map[string]any{
 					"parentScanPerformed": true,
 					"siblingProjects":     []string{},
 				}),
@@ -322,7 +323,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "container files",
 			domain: "container",
 			sect: exploreSections{
-				containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
+				container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
 			},
 			want: true,
 		},
@@ -330,7 +331,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "container running",
 			domain: "container",
 			sect: exploreSections{
-				containerOverview: mustRawJSON(t, map[string]any{"runningContainerCount": 2}),
+				container: mustRawJSON(t, map[string]any{"containerFound": map[string]any{"docker": []string{"name@web image@img:1 ports@8080:80 mounts@"}}}),
 			},
 			want: true,
 		},
@@ -338,7 +339,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "container cli available",
 			domain: "container",
 			sect: exploreSections{
-				containerOverview: mustRawJSON(t, map[string]any{"availableContainerCLICount": 1}),
+				container: mustRawJSON(t, map[string]any{"cliFound": []string{"podman"}}),
 			},
 			want: true,
 		},
@@ -346,7 +347,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "container empty",
 			domain: "container",
 			sect: exploreSections{
-				containerOverview: mustRawJSON(t, map[string]any{}),
+				container: mustRawJSON(t, map[string]any{}),
 			},
 			want: false,
 		},
@@ -354,7 +355,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools makefile",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -362,7 +363,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools scripts",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"package.json"}, "scriptsFound": map[string]any{"package": []string{"build"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"package.json"}, "scriptsFound": map[string]any{"package": []string{"build"}}}),
 			},
 			want: true,
 		},
@@ -370,7 +371,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools empty",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{}),
+				tools: mustRawJSON(t, map[string]any{}),
 			},
 			want: false,
 		},
@@ -378,7 +379,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "structure invalid json",
 			domain: "structure",
 			sect: exploreSections{
-				repoStructure: json.RawMessage("{"),
+				structure: json.RawMessage("{"),
 			},
 			want: false,
 		},
@@ -386,7 +387,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "parent invalid json",
 			domain: "parent",
 			sect: exploreSections{
-				workspaceContext: json.RawMessage("{"),
+				workspace: json.RawMessage("{"),
 			},
 			want: false,
 		},
@@ -394,7 +395,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "git invalid json",
 			domain: "git",
 			sect: exploreSections{
-				gitOverview: json.RawMessage("{"),
+				git: json.RawMessage("{"),
 			},
 			want: false,
 		},
@@ -410,7 +411,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			name:   "tools shell scripts",
 			domain: "tools",
 			sect: exploreSections{
-				projectTools: mustRawJSON(t, map[string]any{"toolsFound": []string{"*.sh"}, "scriptsFound": map[string]any{"shell": []string{"run.sh"}}}),
+				tools: mustRawJSON(t, map[string]any{"toolsFound": []string{"*.sh"}, "scriptsFound": map[string]any{"shell": []string{"run.sh"}}}),
 			},
 			want: true,
 		},
@@ -443,10 +444,9 @@ func TestHasContainerOverviewData(t *testing.T) {
 	}{
 		{name: "empty", raw: nil, want: false},
 		{name: "invalid json", raw: json.RawMessage("{"), want: false},
-		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 0, "runningContainerCount": 0}), want: false},
-		{name: "files", raw: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}), want: true},
-		{name: "running", raw: mustRawJSON(t, map[string]any{"runningContainerCount": 1}), want: true},
-		{name: "available cli", raw: mustRawJSON(t, map[string]any{"availableContainerCLICount": 1}), want: true},
+		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"cliFound": []string{}, "containerFound": map[string]any{}}), want: false},
+		{name: "cli", raw: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}), want: true},
+		{name: "running", raw: mustRawJSON(t, map[string]any{"containerFound": map[string]any{"docker": []string{"name@web"}}}), want: true},
 	}
 
 	for _, tc := range tests {
@@ -491,12 +491,12 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 	t.Parallel()
 
 	sections := exploreSections{
-		repoStructure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 1}),
-		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
+		structure:     mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 1}),
+		git:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
+		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
 		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 @direct"}),
-		containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
-		projectTools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
+		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
+		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make": []string{"build"}}}),
 	}
 
 	instructions := buildAgentBehaviorInstructions(sections)
@@ -521,8 +521,8 @@ func TestBuildAgentBehaviorInstructionsSkipsEmptyDomainText(t *testing.T) {
 	catalog["git"] = ""
 
 	sections := exploreSections{
-		repoStructure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 0}),
-		gitOverview:   mustRawJSON(t, map[string]any{"isGitRepo": true}),
+		structure: mustRawJSON(t, map[string]any{"repoScanDepthLimit": 6, "entryCount": 0}),
+		git:   mustRawJSON(t, map[string]any{"isGitRepo": true}),
 	}
 
 	instructions := buildAgentBehaviorInstructionsWith(sections, catalog)
@@ -667,18 +667,18 @@ func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
 	var resp exploreResponse
 	testutil.ParseJSON(t, jsonText, &resp)
 
-	assertSectionHasField(t, "repoStructure", resp.RepoStructure, "repoScanDepthLimit")
-	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "repoScanPerformed")
-	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "entries")
-	assertSectionMissingField(t, "repoStructure", resp.RepoStructure, "entryCount")
+	assertSectionHasField(t, "structure", resp.Structure, "repoScanDepthLimit")
+	assertSectionMissingField(t, "structure", resp.Structure, "repoScanPerformed")
+	assertSectionMissingField(t, "structure", resp.Structure, "entries")
+	assertSectionMissingField(t, "structure", resp.Structure, "entryCount")
 
-	assertSectionHasField(t, "gitOverview", resp.GitOverview, "recentCommitsListed")
-	assertSectionMissingField(t, "gitOverview", resp.GitOverview, "recentCommitCount")
-	assertSectionMissingField(t, "gitOverview", resp.GitOverview, "someRecentCommits")
+	assertSectionHasField(t, "git", resp.Git, "recentCommitsListed")
+	assertSectionMissingField(t, "git", resp.Git, "recentCommitCount")
+	assertSectionMissingField(t, "git", resp.Git, "someRecentCommits")
 
-	assertSectionHasField(t, "workspaceContext", resp.WorkspaceContext, "parentScanPerformed")
-	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "siblingProjects")
-	assertSectionMissingField(t, "workspaceContext", resp.WorkspaceContext, "siblingProjectCount")
+	assertSectionHasField(t, "workspace", resp.Workspace, "parentScanPerformed")
+	assertSectionMissingField(t, "workspace", resp.Workspace, "siblingProjects")
+	assertSectionMissingField(t, "workspace", resp.Workspace, "siblingProjectCount")
 }
 
 func testExploreSettings(verbose bool) exploreSettings {

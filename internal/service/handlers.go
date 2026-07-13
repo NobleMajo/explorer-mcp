@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
+	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/cli"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/container"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/deps"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/git"
@@ -31,7 +32,7 @@ var readOnlyToolAnnotations = &mcpsdk.ToolAnnotations{
 func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
-		Description: "Workspace overview as JSON with repoStructure, gitOverview, workspaceContext, dependencies, containerOverview, projectTools, agentBehaviorMainInstruction, and agentBehaviorInstructions",
+		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, _ struct{}) (*mcpsdk.CallToolResult, any, error) {
 		return jsonToolResult(func() (string, error) {
@@ -53,12 +54,13 @@ var AgentBehaviorInstructions = map[string]string{
 type exploreResponse struct {
 	responseMeta
 	ProjectRootPath     string            `json:"projectRootPath"`
-	RepoStructure       json.RawMessage   `json:"repoStructure"`
-	GitOverview         json.RawMessage   `json:"gitOverview"`
-	WorkspaceContext    json.RawMessage   `json:"workspaceContext"`
-	Dependencies        json.RawMessage   `json:"dependencies"`
-	ContainerOverview   json.RawMessage   `json:"containerOverview"`
-	ProjectTools                   json.RawMessage   `json:"projectTools"`
+	Structure         json.RawMessage   `json:"structure"`
+	Git               json.RawMessage   `json:"git"`
+	Workspace         json.RawMessage   `json:"workspace"`
+	Dependencies      json.RawMessage   `json:"dependencies"`
+	Container         json.RawMessage   `json:"container"`
+	Tools             json.RawMessage   `json:"tools"`
+	CLI               json.RawMessage   `json:"cli"`
 	AgentBehaviorMainInstruction   string            `json:"agentBehaviorMainInstruction,omitempty"`
 	AgentBehaviorInstructions      map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
@@ -99,13 +101,19 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 		return "", err
 	}
 
+	cliOverview, err := overviewSection(cli.CLIOverview, settings.verbose)
+	if err != nil {
+		return "", err
+	}
+
 	sections := exploreSections{
-		repoStructure:     repoStructure,
-		gitOverview:       gitOverview,
-		workspaceContext:  workspaceContext,
-		dependencies:      dependencies,
-		containerOverview: containerOverview,
-		projectTools:      projectTools,
+		structure:     repoStructure,
+		git:           gitOverview,
+		workspace:     workspaceContext,
+		dependencies:  dependencies,
+		container:     containerOverview,
+		tools:         projectTools,
+		cli:           cliOverview,
 	}
 
 	response := exploreResponse{
@@ -114,12 +122,13 @@ func buildExploreResponse(settings exploreSettings) (string, error) {
 			SchemaVersion: jsonresp.SchemaVersion,
 		},
 		ProjectRootPath:   projectRoot,
-		RepoStructure:     sections.repoStructure,
-		GitOverview:       sections.gitOverview,
-		WorkspaceContext:  sections.workspaceContext,
-		Dependencies:      sections.dependencies,
-		ContainerOverview: sections.containerOverview,
-		ProjectTools:      sections.projectTools,
+		Structure:   sections.structure,
+		Git:         sections.git,
+		Workspace:   sections.workspace,
+		Dependencies: sections.dependencies,
+		Container:   sections.container,
+		Tools:       sections.tools,
+		CLI:         sections.cli,
 	}
 
 	if !settings.removeBehaviorInstruction {
@@ -161,12 +170,13 @@ func buildAgentBehaviorInstructionsWith(sections exploreSections, catalog map[st
 }
 
 type exploreSections struct {
-	repoStructure     json.RawMessage
-	gitOverview       json.RawMessage
-	workspaceContext  json.RawMessage
-	dependencies      json.RawMessage
-	containerOverview json.RawMessage
-	projectTools      json.RawMessage
+	structure     json.RawMessage
+	git           json.RawMessage
+	workspace     json.RawMessage
+	dependencies  json.RawMessage
+	container     json.RawMessage
+	tools         json.RawMessage
+	cli           json.RawMessage
 }
 
 func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool {
@@ -176,7 +186,7 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 			RepoScanDepthLimit int `json:"repoScanDepthLimit"`
 			EntryCount         int `json:"entryCount"`
 		}
-		if json.Unmarshal(sections.repoStructure, &structure) != nil {
+		if json.Unmarshal(sections.structure, &structure) != nil {
 			return false
 		}
 		if structure.RepoScanDepthLimit < 1 {
@@ -187,13 +197,13 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		var git struct {
 			IsGitRepo bool `json:"isGitRepo"`
 		}
-		return json.Unmarshal(sections.gitOverview, &git) == nil && git.IsGitRepo
+		return json.Unmarshal(sections.git, &git) == nil && git.IsGitRepo
 	case "parent":
 		var parent struct {
 			ParentScanPerformed bool     `json:"parentScanPerformed"`
 			SiblingProjects     []string `json:"siblingProjects"`
 		}
-		if json.Unmarshal(sections.workspaceContext, &parent) != nil {
+		if json.Unmarshal(sections.workspace, &parent) != nil {
 			return false
 		}
 		if !parent.ParentScanPerformed {
@@ -204,9 +214,9 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		var deps []string
 		return json.Unmarshal(sections.dependencies, &deps) == nil && len(deps) > 0
 	case "container":
-		return hasContainerOverviewData(sections.containerOverview)
+		return hasContainerOverviewData(sections.container)
 	case "tools":
-		return hasProjectToolsData(sections.projectTools)
+		return hasProjectToolsData(sections.tools)
 	default:
 		return false
 	}
@@ -218,17 +228,22 @@ func hasContainerOverviewData(containerOverview json.RawMessage) bool {
 	}
 
 	var overview struct {
-		DetectedContainerFileCount int `json:"detectedContainerFileCount"`
-		RunningContainerCount      int `json:"runningContainerCount"`
-		AvailableContainerCLICount int `json:"availableContainerCLICount"`
+		CLIFound       []string            `json:"cliFound"`
+		ContainerFound map[string][]string `json:"containerFound"`
 	}
 	if json.Unmarshal(containerOverview, &overview) != nil {
 		return false
 	}
 
-	return overview.DetectedContainerFileCount > 0 ||
-		overview.RunningContainerCount > 0 ||
-		overview.AvailableContainerCLICount > 0
+	if len(overview.CLIFound) > 0 {
+		return true
+	}
+	for _, containers := range overview.ContainerFound {
+		if len(containers) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func hasProjectToolsData(projectTools json.RawMessage) bool {

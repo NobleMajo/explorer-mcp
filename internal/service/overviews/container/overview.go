@@ -1,33 +1,19 @@
 package container
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
 
-	"github.com/NobleMajo/explorer-mcp/internal/fsutil"
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
 )
 
 type containerOverviewResponse struct {
-	IsDockerAvailable          bool               `json:"isDockerAvailable"`
-	IsPodmanAvailable          bool               `json:"isPodmanAvailable"`
-	AvailableContainerCLICount int                `json:"availableContainerCLICount"`
-	AvailableContainerCLINames []string           `json:"availableContainerCLINames"`
-	DetectedContainerFileCount int                `json:"detectedContainerFileCount"`
-	DetectedContainerFilePaths []string           `json:"detectedContainerFilePaths"`
-	RunningContainerCount      int                `json:"runningContainerCount"`
-	RunningContainers          []runningContainer `json:"runningContainers"`
-}
-
-type runningContainer struct {
-	ContainerName string `json:"containerName"`
-	ImageName     string `json:"imageName"`
-	StatusText    string `json:"statusText"`
-	RuntimeName   string `json:"runtimeName"`
+	CLIFound       []string            `json:"cliFound,omitempty"`
+	ContainerFound map[string][]string `json:"containerFound,omitempty"`
 }
 
 func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
@@ -37,36 +23,25 @@ func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
 		return containerOverviewResponse{}, err
 	}
 
-	resp := containerOverviewResponse{
-		DetectedContainerFilePaths: []string{},
-		RunningContainers:          []runningContainer{},
-		AvailableContainerCLINames: []string{},
-	}
+	cliFound := detectAvailableContainerCLIs()
+	containerFound := make(map[string][]string)
 
-	availableCLIs := detectAvailableContainerCLIs()
-	resp.AvailableContainerCLINames = availableCLIs
-	resp.AvailableContainerCLICount = len(availableCLIs)
-	resp.IsDockerAvailable = slices.Contains(availableCLIs, "docker")
-	resp.IsPodmanAvailable = slices.Contains(availableCLIs, "podman")
-
-	paths, err := detectContainerFilePaths(root)
-	if err != nil {
-		return containerOverviewResponse{}, err
-	}
-	resp.DetectedContainerFilePaths = paths
-	resp.DetectedContainerFileCount = len(paths)
-
-	containers := make([]runningContainer, 0)
 	for _, runtimeName := range globals.KnownContainerRuntimeCLINames {
-		if !slices.Contains(availableCLIs, runtimeName) {
+		if !slices.Contains(cliFound, runtimeName) {
 			continue
 		}
-		containers = append(containers, listRunningContainers(runtimeName, root)...)
+		entries := listRunningContainerEntries(runtimeName, root)
+		if len(entries) > 0 {
+			containerFound[runtimeName] = entries
+		}
 	}
-	resp.RunningContainers = containers
-	resp.RunningContainerCount = len(containers)
 
-	return resp, nil
+	sort.Strings(cliFound)
+
+	return containerOverviewResponse{
+		CLIFound:       cliFound,
+		ContainerFound: containerFound,
+	}, nil
 }
 
 func detectAvailableContainerCLIs() []string {
@@ -79,62 +54,16 @@ func detectAvailableContainerCLIs() []string {
 	return available
 }
 
-func detectContainerFilePaths(root string) ([]string, error) {
-	seen := make(map[string]bool)
-	paths := make([]string, 0)
-
-	addPath := func(relPath string) {
-		if relPath == "" || seen[relPath] {
-			return
-		}
-		seen[relPath] = true
-		paths = append(paths, relPath)
-	}
-
-	for _, pattern := range globals.KnownContainerFileNames {
-		if strings.Contains(pattern, "*") {
-			matches, err := filepath.Glob(filepath.Join(root, pattern))
-			if err != nil {
-				return nil, err
-			}
-			for _, match := range matches {
-				if fsutil.FileExists(match) {
-					addPath(filepath.Base(match))
-				}
-			}
-			continue
-		}
-
-		if fsutil.FileExists(filepath.Join(root, pattern)) {
-			addPath(pattern)
-		}
-	}
-
-	for _, dirName := range globals.KnownContainerDirectoryNames {
-		if fsutil.DirExists(filepath.Join(root, dirName)) {
-			addPath(dirName + "/")
-		}
-	}
-
-	devcontainerConfig := filepath.Join(".devcontainer", "devcontainer.json")
-	if fsutil.FileExists(filepath.Join(root, devcontainerConfig)) {
-		addPath(devcontainerConfig)
-	}
-
-	sort.Strings(paths)
-	return paths, nil
-}
-
-func listRunningContainers(runtimeName, dir string) []runningContainer {
-	cmd := exec.Command(runtimeName, "ps", "--format", "{{.Names}}\t{{.Image}}\t{{.Status}}")
+func listRunningContainerEntries(runtimeName, dir string) []string {
+	cmd := exec.Command(runtimeName, "ps", "--format", "{{.Names}}\t{{.Image}}\t{{.Ports}}")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
-		return []runningContainer{}
+		return nil
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	containers := make([]runningContainer, 0, len(lines))
+	entries := make([]string, 0, len(lines))
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -142,18 +71,47 @@ func listRunningContainers(runtimeName, dir string) []runningContainer {
 		}
 
 		fields := strings.Split(line, "\t")
-		container := runningContainer{RuntimeName: runtimeName}
-		if len(fields) > 0 {
-			container.ContainerName = fields[0]
-		}
-		if len(fields) > 1 {
-			container.ImageName = fields[1]
-		}
-		if len(fields) > 2 {
-			container.StatusText = fields[2]
-		}
-		containers = append(containers, container)
+		name := fieldAt(fields, 0)
+		image := fieldAt(fields, 1)
+		ports := fieldAt(fields, 2)
+		mounts := containerMounts(runtimeName, dir, name)
+
+		entries = append(entries, formatContainerEntry(name, image, ports, mounts))
 	}
 
-	return containers
+	sort.Strings(entries)
+	return entries
+}
+
+func fieldAt(fields []string, index int) string {
+	if index >= len(fields) {
+		return ""
+	}
+	return strings.TrimSpace(fields[index])
+}
+
+func containerMounts(runtimeName, dir, containerName string) string {
+	if containerName == "" {
+		return ""
+	}
+
+	cmd := exec.Command(
+		runtimeName,
+		"inspect",
+		"-f",
+		"{{range .Mounts}}{{.Source}}:{{.Destination}};{{end}}",
+		containerName,
+	)
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+
+	mounts := strings.TrimSpace(string(out))
+	return strings.TrimSuffix(mounts, ";")
+}
+
+func formatContainerEntry(name, image, ports, mounts string) string {
+	return fmt.Sprintf("name@%s image@%s ports@%s mounts@%s", name, image, ports, mounts)
 }
