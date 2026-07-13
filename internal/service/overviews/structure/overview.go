@@ -12,13 +12,9 @@ import (
 
 type repoStructureResponse struct {
 	jsonresp.Meta
-	RootPath              string           `json:"rootPath"`
-	MaxDepth              int              `json:"maxDepth"`
-	FollowGitIgnore       bool             `json:"followGitIgnore"`
-	IgnoredDirectoryNames []string         `json:"ignoredDirectoryNames"`
-	IgnoredFileNames      []string         `json:"ignoredFileNames"`
-	EntryCount            int              `json:"entryCount"`
-	Entries               []structureEntry `json:"entries"`
+	RootPath    string           `json:"rootPath"`
+	EntryCount  int              `json:"entryCount"`
+	Entries     []structureEntry `json:"entries"`
 }
 
 type structureEntry struct {
@@ -66,23 +62,14 @@ func buildRepoStructure(verbose bool) (repoStructureResponse, error) {
 		return repoStructureResponse{}, err
 	}
 
-	ignoredDirNames := append([]string(nil), globals.ScanIgnoreFiles...)
-	sort.Strings(ignoredDirNames)
-	ignoredFileNames := append([]string(nil), globals.IgnoreFiles...)
-	sort.Strings(ignoredFileNames)
-
 	return repoStructureResponse{
 		Meta: jsonresp.Meta{
 			ToolName:      "repo_structure",
 			SchemaVersion: jsonresp.SchemaVersion,
 		},
-		RootPath:              root,
-		MaxDepth:              globals.StructureScanMaxDepth,
-		FollowGitIgnore:       globals.FollowGitIgnore,
-		IgnoredDirectoryNames: ignoredDirNames,
-		IgnoredFileNames:      ignoredFileNames,
-		EntryCount:            len(entries),
-		Entries:               entries,
+		RootPath:   root,
+		EntryCount: len(entries),
+		Entries:    entries,
 	}, nil
 }
 
@@ -101,17 +88,11 @@ func appendStructureEntries(root, dir string, depth int, entries *[]structureEnt
 	}
 
 	sort.Slice(dirEntries, func(i, j int) bool {
-		if dirEntries[i].IsDir() != dirEntries[j].IsDir() {
-			return dirEntries[i].IsDir()
-		}
 		return dirEntries[i].Name() < dirEntries[j].Name()
 	})
 
 	for _, entry := range dirEntries {
 		if globals.IsScanIgnored(entry.Name()) {
-			continue
-		}
-		if !entry.IsDir() && globals.IsIgnoredFile(entry.Name()) {
 			continue
 		}
 
@@ -124,23 +105,23 @@ func appendStructureEntries(root, dir string, depth int, entries *[]structureEnt
 			continue
 		}
 
-		relPath = filepath.ToSlash(relPath)
-		if entry.IsDir() {
-			relPath += "/"
-		}
-
-		*entries = append(*entries, structureEntry{
-			RelativePath: relPath,
-			EntryName:    entry.Name(),
-			IsDirectory:  entry.IsDir(),
-			Depth:        depth + 1,
-		})
-
 		if entry.IsDir() {
 			if err := appendStructureEntries(root, fullPath, depth+1, entries, state); err != nil {
 				return err
 			}
+			continue
 		}
+
+		if globals.IsIgnoredFile(entry.Name()) {
+			continue
+		}
+
+		*entries = append(*entries, structureEntry{
+			RelativePath: filepath.ToSlash(relPath),
+			EntryName:    entry.Name(),
+			IsDirectory:  false,
+			Depth:        depth + 1,
+		})
 	}
 
 	return nil

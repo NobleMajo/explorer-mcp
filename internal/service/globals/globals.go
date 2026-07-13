@@ -32,6 +32,23 @@ var KnownContainerDirectoryNames = []string{
 	"containers",
 }
 
+var KnownContainerCLINames = []string{
+	"docker",
+	"podman",
+	"nerdctl",
+	"buildah",
+	"skopeo",
+	"docker-compose",
+	"podman-compose",
+	"compose",
+}
+
+var KnownContainerRuntimeCLINames = []string{
+	"docker",
+	"podman",
+	"nerdctl",
+}
+
 type ManifestLoader func(root, manifestPath string) (EcosystemResult, error)
 
 var ManifestLoaders = map[string]ManifestLoader{

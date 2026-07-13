@@ -1,6 +1,7 @@
 package globals
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -23,5 +24,16 @@ func TestKnownContainerGlobalsShape(t *testing.T) {
 	}
 	if globPatterns != 8 {
 		t.Fatalf("glob pattern count = %d, want 8", globPatterns)
+	}
+	if len(KnownContainerCLINames) != 8 {
+		t.Fatalf("len(KnownContainerCLINames) = %d, want 8", len(KnownContainerCLINames))
+	}
+	if len(KnownContainerRuntimeCLINames) != 3 {
+		t.Fatalf("len(KnownContainerRuntimeCLINames) = %d, want 3", len(KnownContainerRuntimeCLINames))
+	}
+	for _, runtimeName := range KnownContainerRuntimeCLINames {
+		if !slices.Contains(KnownContainerCLINames, runtimeName) {
+			t.Fatalf("runtime %q missing from KnownContainerCLINames", runtimeName)
+		}
 	}
 }

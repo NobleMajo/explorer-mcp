@@ -217,7 +217,7 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 	instructions := buildAgentBehaviorInstructions(exploreSections{
 		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 0}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": false}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{{"isCurrentProject": true}}}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{}}),
 		dependencies:      mustRawJSON(t, map[string]any{"ecosystemCount": 0}),
 		containerOverview: mustRawJSON(t, map[string]any{}),
 		projectTools:      mustRawJSON(t, map[string]any{}),
@@ -278,8 +278,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
 					"siblingProjects": []map[string]any{
-						{"isCurrentProject": true},
-						{"isCurrentProject": false},
+						{"relativePath": "../other"},
 					},
 				}),
 			},
@@ -290,9 +289,7 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "parent",
 			sect: exploreSections{
 				workspaceContext: mustRawJSON(t, map[string]any{
-					"siblingProjects": []map[string]any{
-						{"isCurrentProject": true},
-					},
+					"siblingProjects": []map[string]any{},
 				}),
 			},
 			want: false,
@@ -326,6 +323,14 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			domain: "container",
 			sect: exploreSections{
 				containerOverview: mustRawJSON(t, map[string]any{"runningContainerCount": 2}),
+			},
+			want: true,
+		},
+		{
+			name:   "container cli available",
+			domain: "container",
+			sect: exploreSections{
+				containerOverview: mustRawJSON(t, map[string]any{"availableContainerCLICount": 1}),
 			},
 			want: true,
 		},
@@ -439,6 +444,7 @@ func TestHasContainerOverviewData(t *testing.T) {
 		{name: "zero counts", raw: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 0, "runningContainerCount": 0}), want: false},
 		{name: "files", raw: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}), want: true},
 		{name: "running", raw: mustRawJSON(t, map[string]any{"runningContainerCount": 1}), want: true},
+		{name: "available cli", raw: mustRawJSON(t, map[string]any{"availableContainerCLICount": 1}), want: true},
 	}
 
 	for _, tc := range tests {
@@ -485,7 +491,7 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 	sections := exploreSections{
 		repoStructure:     mustRawJSON(t, map[string]any{"entryCount": 1}),
 		gitOverview:       mustRawJSON(t, map[string]any{"isGitRepo": true}),
-		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{{"isCurrentProject": false}}}),
+		workspaceContext:  mustRawJSON(t, map[string]any{"siblingProjects": []map[string]any{{"relativePath": "../other"}}}),
 		dependencies:      mustRawJSON(t, map[string]any{"ecosystemCount": 1}),
 		containerOverview: mustRawJSON(t, map[string]any{"detectedContainerFileCount": 1}),
 		projectTools:      mustRawJSON(t, map[string]any{"makefileTargetCount": 1}),

@@ -175,18 +175,13 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 	case "parent":
 		var parent struct {
 			SiblingProjects []struct {
-				IsCurrentProject bool `json:"isCurrentProject"`
+				RelativePath string `json:"relativePath"`
 			} `json:"siblingProjects"`
 		}
 		if json.Unmarshal(sections.workspaceContext, &parent) != nil {
 			return false
 		}
-		for _, sibling := range parent.SiblingProjects {
-			if !sibling.IsCurrentProject {
-				return true
-			}
-		}
-		return false
+		return len(parent.SiblingProjects) > 0
 	case "deps":
 		var deps struct {
 			EcosystemCount int `json:"ecosystemCount"`
@@ -209,12 +204,15 @@ func hasContainerOverviewData(containerOverview json.RawMessage) bool {
 	var overview struct {
 		DetectedContainerFileCount int `json:"detectedContainerFileCount"`
 		RunningContainerCount      int `json:"runningContainerCount"`
+		AvailableContainerCLICount int `json:"availableContainerCLICount"`
 	}
 	if json.Unmarshal(containerOverview, &overview) != nil {
 		return false
 	}
 
-	return overview.DetectedContainerFileCount > 0 || overview.RunningContainerCount > 0
+	return overview.DetectedContainerFileCount > 0 ||
+		overview.RunningContainerCount > 0 ||
+		overview.AvailableContainerCLICount > 0
 }
 
 func hasProjectToolsData(projectTools json.RawMessage) bool {

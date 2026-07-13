@@ -17,10 +17,8 @@ type workspaceContextResponse struct {
 }
 
 type siblingProject struct {
-	DirectoryName    string `json:"directoryName"`
-	AbsolutePath     string `json:"absolutePath"`
-	IsCurrentProject bool   `json:"isCurrentProject"`
-	IsGitRepo        bool   `json:"isGitRepo"`
+	RelativePath string `json:"relativePath"`
+	IsGitRepo    bool   `json:"isGitRepo"`
 }
 
 func buildWorkspaceContext(verbose bool) (workspaceContextResponse, error) {
@@ -61,16 +59,23 @@ func listSiblingProjects(parent, cwd string) ([]siblingProject, error) {
 		}
 
 		absPath := filepath.Join(parent, entry.Name())
+		if absPath == cwd {
+			continue
+		}
+
+		relPath, err := filepath.Rel(cwd, absPath)
+		if err != nil {
+			return nil, err
+		}
+
 		siblings = append(siblings, siblingProject{
-			DirectoryName:    entry.Name(),
-			AbsolutePath:     absPath,
-			IsCurrentProject: absPath == cwd,
-			IsGitRepo:        hasGitMetadata(absPath),
+			RelativePath: filepath.ToSlash(relPath),
+			IsGitRepo:    hasGitMetadata(absPath),
 		})
 	}
 
 	sort.Slice(siblings, func(i, j int) bool {
-		return siblings[i].DirectoryName < siblings[j].DirectoryName
+		return siblings[i].RelativePath < siblings[j].RelativePath
 	})
 
 	return siblings, nil

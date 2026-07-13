@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/NobleMajo/explorer-mcp/internal/fsutil"
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
 )
+
+var makefileTargetNamePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]*$`)
 
 type projectToolsResponse struct {
 	jsonresp.Meta
@@ -78,31 +81,77 @@ func parseMakefileTargetNames(content string) []string {
 	targets := make([]string, 0)
 	seen := make(map[string]bool)
 
+	addTarget := func(name string) {
+		if name == "" || seen[name] || !isValidMakefileTargetName(name) {
+			return
+		}
+		seen[name] = true
+		targets = append(targets, name)
+	}
+
 	for _, line := range strings.Split(content, "\n") {
-		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "\t") {
 			continue
 		}
-		if strings.HasPrefix(line, ".") {
+
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 
-		before, _, ok := strings.Cut(line, ":")
+		if strings.HasPrefix(trimmed, ".") {
+			if phony, ok := strings.CutPrefix(trimmed, ".PHONY:"); ok {
+				for _, part := range strings.Fields(phony) {
+					addTarget(part)
+				}
+			}
+			continue
+		}
+
+		if isMakefileDirective(trimmed) || isMakefileAssignment(trimmed) {
+			continue
+		}
+
+		if strings.HasPrefix(trimmed, "@") || strings.HasPrefix(trimmed, "-") || strings.HasPrefix(trimmed, "+") {
+			continue
+		}
+
+		before, _, ok := strings.Cut(trimmed, ":")
 		if !ok {
 			continue
 		}
 
-		for _, part := range strings.Fields(before) {
-			if part == "" || seen[part] {
-				continue
-			}
-			seen[part] = true
-			targets = append(targets, part)
+		for _, part := range strings.Fields(strings.TrimSpace(before)) {
+			addTarget(part)
 		}
 	}
 
 	sort.Strings(targets)
 	return targets
+}
+
+func isMakefileAssignment(line string) bool {
+	if strings.Contains(line, ":=") || strings.Contains(line, "?=") || strings.Contains(line, "+=") {
+		return true
+	}
+
+	eq := strings.Index(line, "=")
+	colon := strings.Index(line, ":")
+	return eq >= 0 && (colon < 0 || eq < colon)
+}
+
+func isMakefileDirective(line string) bool {
+	directive, _, _ := strings.Cut(line, " ")
+	switch directive {
+	case "ifdef", "ifndef", "endif", "else", "export", "include", "-include", "override", "define", "endef", "vpath", "unexport":
+		return true
+	default:
+		return strings.HasPrefix(line, "$(shell")
+	}
+}
+
+func isValidMakefileTargetName(name string) bool {
+	return makefileTargetNamePattern.MatchString(name)
 }
 
 func parsePackageJsonScriptNames(path string) ([]string, error) {

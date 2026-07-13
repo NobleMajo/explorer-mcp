@@ -43,49 +43,41 @@ func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	if resp.ToolName != "repo_structure" || resp.MaxDepth != globals.StructureScanMaxDepth {
+	if resp.ToolName != "repo_structure" {
 		t.Fatalf("unexpected meta: %+v", resp.Meta)
-	}
-	if !resp.FollowGitIgnore {
-		t.Fatal("expected followGitIgnore true in response")
 	}
 	if resp.EntryCount != len(resp.Entries) {
 		t.Fatalf("entryCount = %d, len(entries) = %d", resp.EntryCount, len(resp.Entries))
 	}
 
-	wantIgnoredDirs := append([]string(nil), globals.ScanIgnoreFiles...)
-	slices.Sort(wantIgnoredDirs)
-	if !slices.Equal(resp.IgnoredDirectoryNames, wantIgnoredDirs) {
-		t.Fatalf("ignoredDirectoryNames = %v, want %v", resp.IgnoredDirectoryNames, wantIgnoredDirs)
-	}
-	wantIgnoredFiles := append([]string(nil), globals.IgnoreFiles...)
-	slices.Sort(wantIgnoredFiles)
-	if !slices.Equal(resp.IgnoredFileNames, wantIgnoredFiles) {
-		t.Fatalf("ignoredFileNames = %v, want %v", resp.IgnoredFileNames, wantIgnoredFiles)
-	}
-
 	names := entryNames(resp.Entries)
-	for _, forbidden := range append(slices.Clone(globals.ScanIgnoreFiles), append(slices.Clone(globals.IgnoreFiles), "ignored.txt", "ignored-output", "skip.txt", "notes.tmp")...) {
+	for _, forbidden := range append(slices.Clone(globals.ScanIgnoreFiles), "ignored.txt", "ignored-output", "skip.txt", "notes.tmp") {
 		if slices.Contains(names, forbidden) {
 			t.Fatalf("expected %q to be ignored, entries=%v", forbidden, names)
 		}
 	}
-	for _, required := range []string{"main.go", "src", "app.go"} {
+	for _, required := range []string{"main.go", "app.go"} {
 		if !slices.Contains(names, required) {
 			t.Fatalf("expected %q in entries, got %v", required, names)
 		}
 	}
+	for _, entry := range resp.Entries {
+		if entry.IsDirectory {
+			t.Fatalf("expected files only, got directory entry %+v", entry)
+		}
+		if strings.HasSuffix(entry.RelativePath, "/") {
+			t.Fatalf("expected file path, got directory path %q", entry.RelativePath)
+		}
+	}
 }
 
-func TestStructureSortOrderAndDirectoryPaths(t *testing.T) {
+func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(root+"/zdir", 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.MkdirAll(root+"/adir", 0o755); err != nil {
 		t.Fatal(err)
 	}
 	testutil.WriteFile(t, root+"/zfile.go", "package z\n")
+	testutil.WriteFile(t, root+"/adir/afile.go", "package a\n")
 	testutil.WriteFile(t, root+"/afile.go", "package a\n")
 
 	entries := make([]structureEntry, 0)
@@ -93,35 +85,22 @@ func TestStructureSortOrderAndDirectoryPaths(t *testing.T) {
 		t.Fatalf("appendStructureEntries() error: %v", err)
 	}
 
-	if len(entries) < 4 {
-		t.Fatalf("expected at least 4 entries, got %d", len(entries))
+	if len(entries) != 3 {
+		t.Fatalf("expected 3 file entries, got %d: %+v", len(entries), entries)
 	}
 
-	// dirs before files at same depth
-	firstFileIdx := -1
-	for i, entry := range entries {
-		if entry.Depth == 1 && !entry.IsDirectory && firstFileIdx == -1 {
-			firstFileIdx = i
-		}
-		if entry.Depth == 1 && entry.IsDirectory && firstFileIdx != -1 {
-			t.Fatalf("directory %q after file at depth 1", entry.EntryName)
-		}
-	}
-
+	fileNames := make([]string, 0, len(entries))
 	for _, entry := range entries {
-		if entry.IsDirectory && !strings.HasSuffix(entry.RelativePath, "/") {
-			t.Fatalf("directory relativePath %q missing trailing slash", entry.RelativePath)
+		if entry.IsDirectory {
+			t.Fatalf("expected files only, got directory %+v", entry)
 		}
-	}
-
-	dirNames := make([]string, 0)
-	for _, entry := range entries {
-		if entry.Depth == 1 && entry.IsDirectory {
-			dirNames = append(dirNames, entry.EntryName)
+		if strings.Contains(entry.RelativePath, "/") && strings.HasSuffix(entry.RelativePath, "/") {
+			t.Fatalf("unexpected directory path %q", entry.RelativePath)
 		}
+		fileNames = append(fileNames, entry.EntryName)
 	}
-	if !slices.IsSorted(dirNames) {
-		t.Fatalf("directories not sorted: %v", dirNames)
+	if !slices.IsSorted(fileNames) {
+		t.Fatalf("files not sorted: %v", fileNames)
 	}
 }
 
@@ -208,8 +187,11 @@ func TestRepoStructureNestedGitIgnore(t *testing.T) {
 			t.Fatalf("expected %q to be gitignored, entries=%v", forbidden, names)
 		}
 	}
-	if !slices.Contains(names, "pkg") || !slices.Contains(names, "manual.go") {
-		t.Fatalf("expected pkg/manual.go in entries, got %v", names)
+	if !slices.Contains(names, "manual.go") {
+		t.Fatalf("expected manual.go in entries, got %v", names)
+	}
+	if slices.Contains(names, "pkg") {
+		t.Fatalf("expected no directory entries, got %v", names)
 	}
 }
 
@@ -234,13 +216,36 @@ func TestRepoStructureFollowGitIgnoreDisabled(t *testing.T) {
 	}
 
 	resp := result.(repoStructureResponse)
-	if resp.FollowGitIgnore {
-		t.Fatal("expected followGitIgnore false in response")
-	}
 
 	names := entryNames(resp.Entries)
-	if !slices.Contains(names, "build") || !slices.Contains(names, "out.go") {
-		t.Fatalf("expected gitignored paths when disabled, entries=%v", names)
+	if !slices.Contains(names, "out.go") {
+		t.Fatalf("expected out.go when gitignore disabled, entries=%v", names)
+	}
+	if slices.Contains(names, "build") {
+		t.Fatalf("expected no directory entries, got %v", names)
+	}
+}
+
+func TestRepoStructureIncludesEnvFiles(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/.env", "PORT=8080\n")
+	testutil.WriteFile(t, root+"/.env.project", "PROJECT_VERSION=1.0.0\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview()(false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp := result.(repoStructureResponse)
+	paths := make([]string, 0, len(resp.Entries))
+	for _, entry := range resp.Entries {
+		paths = append(paths, entry.RelativePath)
+	}
+	for _, want := range []string{".env", ".env.project"} {
+		if !slices.Contains(paths, want) {
+			t.Fatalf("expected %q in entries, got %v", want, paths)
+		}
 	}
 }
 

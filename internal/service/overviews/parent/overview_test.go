@@ -44,24 +44,11 @@ func TestListSiblingProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listSiblingProjects() error: %v", err)
 	}
-	if len(got) != 2 {
-		t.Fatalf("len(siblings) = %d, want 2", len(got))
+	if len(got) != 1 {
+		t.Fatalf("len(siblings) = %d, want 1", len(got))
 	}
-
-	var currentProject, betaProject *siblingProject
-	for i := range got {
-		switch got[i].DirectoryName {
-		case "alpha":
-			currentProject = &got[i]
-		case "beta":
-			betaProject = &got[i]
-		}
-	}
-	if currentProject == nil || !currentProject.IsCurrentProject || currentProject.IsGitRepo {
-		t.Fatalf("unexpected alpha sibling: %+v", currentProject)
-	}
-	if betaProject == nil || betaProject.IsCurrentProject || !betaProject.IsGitRepo {
-		t.Fatalf("unexpected beta sibling: %+v", betaProject)
+	if got[0].RelativePath != "../beta" || !got[0].IsGitRepo {
+		t.Fatalf("unexpected beta sibling: %+v", got[0])
 	}
 }
 
@@ -93,8 +80,11 @@ func TestWorkspaceContext(t *testing.T) {
 	if resp.CurrentWorkingDirectoryPath != current || resp.ParentDirectoryPath != parent {
 		t.Fatalf("unexpected paths: cwd=%q parent=%q", resp.CurrentWorkingDirectoryPath, resp.ParentDirectoryPath)
 	}
-	if resp.SiblingProjectCount != 2 || len(resp.SiblingProjects) != 2 {
+	if resp.SiblingProjectCount != 1 || len(resp.SiblingProjects) != 1 {
 		t.Fatalf("unexpected siblings: %+v", resp.SiblingProjects)
+	}
+	if resp.SiblingProjects[0].RelativePath != "../other" {
+		t.Fatalf("relativePath = %q, want ../other", resp.SiblingProjects[0].RelativePath)
 	}
 }
 

@@ -60,6 +60,24 @@ func TestDetectContainerFilePathsCoversKnownGlobals(t *testing.T) {
 	}
 }
 
+func TestDetectAvailableContainerCLIs(t *testing.T) {
+	binDir := t.TempDir()
+	for _, name := range []string{"docker", "buildah", "skopeo"} {
+		path := filepath.Join(binDir, name)
+		testutil.WriteFile(t, path, "#!/bin/sh\n")
+		if err := os.Chmod(path, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", binDir)
+
+	got := detectAvailableContainerCLIs()
+	want := []string{"docker", "buildah", "skopeo"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("detectAvailableContainerCLIs() = %v, want %v", got, want)
+	}
+}
+
 func TestContainerOverviewIntegration(t *testing.T) {
 	root := t.TempDir()
 	testutil.WriteFile(t, filepath.Join(root, "Dockerfile"), "FROM alpine\n")
@@ -90,6 +108,12 @@ func TestContainerOverviewIntegration(t *testing.T) {
 	}
 	if !resp.IsDockerAvailable || !resp.IsPodmanAvailable {
 		t.Fatalf("expected both runtimes available, got docker=%v podman=%v", resp.IsDockerAvailable, resp.IsPodmanAvailable)
+	}
+	if resp.AvailableContainerCLICount != 2 {
+		t.Fatalf("availableContainerCLICount = %d, want 2", resp.AvailableContainerCLICount)
+	}
+	if !slices.Equal(resp.AvailableContainerCLINames, []string{"docker", "podman"}) {
+		t.Fatalf("availableContainerCLINames = %v", resp.AvailableContainerCLINames)
 	}
 	if resp.DetectedContainerFileCount != 1 {
 		t.Fatalf("detectedContainerFileCount = %d, want 1", resp.DetectedContainerFileCount)

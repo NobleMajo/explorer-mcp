@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,6 +18,8 @@ type containerOverviewResponse struct {
 	ProjectRootPath            string             `json:"projectRootPath"`
 	IsDockerAvailable          bool               `json:"isDockerAvailable"`
 	IsPodmanAvailable          bool               `json:"isPodmanAvailable"`
+	AvailableContainerCLICount int                `json:"availableContainerCLICount"`
+	AvailableContainerCLINames []string           `json:"availableContainerCLINames"`
 	DetectedContainerFileCount int                `json:"detectedContainerFileCount"`
 	DetectedContainerFilePaths []string           `json:"detectedContainerFilePaths"`
 	RunningContainerCount      int                `json:"runningContainerCount"`
@@ -44,13 +47,15 @@ func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
 		},
 		DetectedContainerFilePaths: []string{},
 		RunningContainers:          []runningContainer{},
+		AvailableContainerCLINames: []string{},
 		ProjectRootPath:            root,
 	}
 
-	_, err = exec.LookPath("docker")
-	resp.IsDockerAvailable = err == nil
-	_, err = exec.LookPath("podman")
-	resp.IsPodmanAvailable = err == nil
+	availableCLIs := detectAvailableContainerCLIs()
+	resp.AvailableContainerCLINames = availableCLIs
+	resp.AvailableContainerCLICount = len(availableCLIs)
+	resp.IsDockerAvailable = slices.Contains(availableCLIs, "docker")
+	resp.IsPodmanAvailable = slices.Contains(availableCLIs, "podman")
 
 	paths, err := detectContainerFilePaths(root)
 	if err != nil {
@@ -60,16 +65,26 @@ func buildContainerOverview(verbose bool) (containerOverviewResponse, error) {
 	resp.DetectedContainerFileCount = len(paths)
 
 	containers := make([]runningContainer, 0)
-	if resp.IsDockerAvailable {
-		containers = append(containers, listRunningContainers("docker", root)...)
-	}
-	if resp.IsPodmanAvailable {
-		containers = append(containers, listRunningContainers("podman", root)...)
+	for _, runtimeName := range globals.KnownContainerRuntimeCLINames {
+		if !slices.Contains(availableCLIs, runtimeName) {
+			continue
+		}
+		containers = append(containers, listRunningContainers(runtimeName, root)...)
 	}
 	resp.RunningContainers = containers
 	resp.RunningContainerCount = len(containers)
 
 	return resp, nil
+}
+
+func detectAvailableContainerCLIs() []string {
+	available := make([]string, 0, len(globals.KnownContainerCLINames))
+	for _, name := range globals.KnownContainerCLINames {
+		if _, err := exec.LookPath(name); err == nil {
+			available = append(available, name)
+		}
+	}
+	return available
 }
 
 func detectContainerFilePaths(root string) ([]string, error) {

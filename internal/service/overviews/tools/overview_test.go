@@ -95,6 +95,25 @@ func TestParsePackageJsonScriptNamesMissingFile(t *testing.T) {
 	}
 }
 
+func TestParseMakefileTargetNamesSkipsAssignmentsAndShellLines(t *testing.T) {
+	t.Parallel()
+
+	content := `PROJECT_VERSION := 1.0.0
+PORT ?= 8080
+help: ##@ prints help
+build test: deps
+	  echo "- os: linux";
+@echo recipe
+.PHONY: docker
+docker: ##@ run container
+`
+	got := parseMakefileTargetNames(content)
+	want := []string{"build", "docker", "help", "test"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parseMakefileTargetNames() = %v, want %v", got, want)
+	}
+}
+
 func TestParseMakefileTargetNamesSkipsNonTargets(t *testing.T) {
 	t.Parallel()
 
