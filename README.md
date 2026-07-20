@@ -26,7 +26,7 @@ explorer-mcp is a lightweight, read-only MCP server that gives AI quick access t
 
 ## Explore resources
 
-`explorer-mcp` collects diffrent resources and provides them to the requesting AI Agent.
+`explorer-mcp` collects different resources and provides them to the requesting AI Agent.
 
 Resources can be enabled or disabled via CLI flags and environment variables. See `explorer-mcp -h` or `explorer-mcp print -h`.
 Some resources are omitted at runtime when prerequisites are missing (no git repo, no container CLI, no `opencode` binary, etc.).
@@ -86,7 +86,7 @@ go run github.com/NobleMajo/explorer-mcp@latest
 ###### *For this section go is required, check out the [install go guide](#install-go).*
 
 ```sh
-go install https://github.com/NobleMajo/explorer-mcp
+go install github.com/NobleMajo/explorer-mcp@latest
 ```
 
 ## Install via wget
@@ -105,7 +105,7 @@ rm /tmp/explorer-mcp.tar.gz
 To build, you need to install go. 
 The required go version is in the `go.mod` file.
 
-## Build
+## Build Instructions
 ###### *For this section go is required, check out the [install go guide](#install-go).*
 
 Clone the repo:
@@ -123,7 +123,7 @@ make build
 # Development
 ###### *For this section go is required, check out the [install go guide](#install-go).*
 
-This part is work in process, i want use 'AIR' as autoreload tool:
+This part is work in progress, I want to use 'AIR' as auto-reload tool:
 ```sh
 make dev #WIP
 ```
