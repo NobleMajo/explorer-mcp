@@ -16,23 +16,23 @@ const (
 )
 
 var nativeToolIDs = map[string]struct{}{
-	"invalid":     {},
-	"question":    {},
-	"bash":        {},
-	"read":        {},
-	"glob":        {},
-	"grep":        {},
-	"edit":        {},
-	"write":       {},
-	"task":        {},
-	"webfetch":    {},
-	"todowrite":   {},
-	"websearch":   {},
-	"skill":       {},
-	"lsp":         {},
-	"plan_enter":  {},
-	"plan_exit":   {},
-	"execute":     {},
+	"invalid":    {},
+	"question":   {},
+	"bash":       {},
+	"read":       {},
+	"glob":       {},
+	"grep":       {},
+	"edit":       {},
+	"write":      {},
+	"task":       {},
+	"webfetch":   {},
+	"todowrite":  {},
+	"websearch":  {},
+	"skill":      {},
+	"lsp":        {},
+	"plan_enter": {},
+	"plan_exit":  {},
+	"execute":    {},
 }
 
 type permissionRule struct {
@@ -42,13 +42,13 @@ type permissionRule struct {
 }
 
 type debugAgentResponse struct {
-	Permission []permissionRule  `json:"permission"`
-	Tools      map[string]bool   `json:"tools"`
+	Permission []permissionRule `json:"permission"`
+	Tools      map[string]bool  `json:"tools"`
 }
 
 type opencodeOverviewResponse struct {
-	Permissions []string `json:"permissions,omitempty"`
-	MCP         []string `json:"mcp,omitempty"`
+	Permissions map[string]any `json:"permissions,omitempty"`
+	MCP         []string       `json:"mcp,omitempty"`
 }
 
 func buildOpencodeOverview(projectRootPath string, verbose bool) (any, error) {
@@ -86,23 +86,11 @@ func buildOpencodeOverview(projectRootPath string, verbose bool) (any, error) {
 	}
 
 	resp := opencodeOverviewResponse{
-		Permissions: formatPermissions(parsed.Permission),
+		Permissions: compactPermissions(parsed.Permission),
 		MCP:         extractMCPServers(parsed.Tools),
 	}
 	logf("end status=ok")
 	return resp, nil
-}
-
-func formatPermissions(rules []permissionRule) []string {
-	if len(rules) == 0 {
-		return nil
-	}
-
-	formatted := make([]string, 0, len(rules))
-	for _, rule := range rules {
-		formatted = append(formatted, fmt.Sprintf("%s '%s'=%s", rule.Permission, rule.Pattern, rule.Action))
-	}
-	return formatted
 }
 
 func extractMCPServers(tools map[string]bool) []string {
