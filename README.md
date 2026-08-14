@@ -2,18 +2,20 @@
 
 # 📡 explorer-mcp
 
+![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![CI/CD](https://github.com/NobleMajo/explorer-mcp/actions/workflows/go-bin-release.yml/badge.svg)
 ![CI/CD](https://github.com/NobleMajo/explorer-mcp/actions/workflows/go-test-build.yml/badge.svg)  
-![MIT](https://img.shields.io/badge/license-MIT-blue.svg)
 ![](https://img.shields.io/badge/dynamic/json?color=green&label=watchers&query=watchers&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2FNobleMajo%2Fexplorer-mcp)
 ![](https://img.shields.io/badge/dynamic/json?color=yellow&label=stars&query=stargazers_count&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2FNobleMajo%2Fexplorer-mcp)
 ![](https://img.shields.io/badge/dynamic/json?color=navy&label=forks&query=forks&suffix=x&url=https%3A%2F%2Fapi.github.com%2Frepos%2FNobleMajo%2Fexplorer-mcp)
 
 </div>
 
-explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
-
 _Why should an AI agent collect context piece by piece when an MCP can collect more information faster and present it in a simple, self-explanatory, compact format?_
+
+## About
+
+explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
 
 <details><summary><strong>Explore resources</strong></summary>
 
