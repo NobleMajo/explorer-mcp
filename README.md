@@ -15,20 +15,7 @@ explorer-mcp is a lightweight, read-only MCP server that gives AI quick access t
 
 _Why should an AI agent collect context piece by piece when an MCP can collect more information faster and present it in a simple, self-explanatory, compact format?_
 
-# Table of Contents
-
-- [Explore resources](#explore-resources)
-  - [Enabled by default](#enabled-by-default)
-  - [Opt-in](#opt-in)
-- [Response design](#response-design)
-- [Requirements](#requirements)
-- [Getting Started](#getting-started)
-- [Quick help](#quick-help)
-- [Install via go](#install-via-go)
-- [Install via wget](#install-via-wget)
-- [Build requirements](#build-requirements)
-- [Build Instructions](#build-instructions)
-- [Install go](#install-go)
+<details><summary><strong>Explore resources</strong></summary>
 
 ## Explore resources
 
@@ -64,6 +51,10 @@ Use `explorer-mcp print [projectRootPath]` to dump the same JSON the MCP `explor
 go run github.com/NobleMajo/explorer-mcp@latest print
 ```
 
+</details>
+
+<details><summary><strong>Response design</strong></summary>
+
 ## Response design
 
 The `explore` JSON follows a few consistent rules:
@@ -77,6 +68,10 @@ The `explore` JSON follows a few consistent rules:
 
 Depth/count flags (`-c`, `-p`, `-d`) control how much is collected; disable flags (`-S`, `-G`, …) skip entire resources.
 MCP note: the `explore` tool requires a **mandatory** input parameter `projectRootPath` (absolute or relative path to project root directory). The path is validated and passed through to all explore resource collectors.
+
+</details>
+
+<details><summary><strong>User Guide</strong></summary>
 
 # User Guide
 
@@ -143,6 +138,10 @@ make build
 ./explorer-mcp
 ```
 
+</details>
+
+<details><summary><strong>Development</strong></summary>
+
 # Development
 
 ###### _For this section go is required, check out the [install go guide](#install-go)._
@@ -164,6 +163,8 @@ git clone git@github.com:udhos/update-golang.git golang-updater
 cd golang-updater
 sudo ./update-golang.sh
 ```
+
+</details>
 
 <div align="center">
 
