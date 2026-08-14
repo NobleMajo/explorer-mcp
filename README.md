@@ -15,7 +15,7 @@ _Why should an AI agent collect context piece by piece when an MCP can collect m
 
 ## About
 
-explorer-mcp is a lightweight, read-only MCP server that gives AI quick access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
+explorer-mcp is a lightweight, MCP server that gives AI quick read-only access to Git repos, folder structures, and context. It cuts time and token usage by handling exploration internally and feeding results to AI agents.
 
 <details><summary><strong>Explore resources</strong></summary>
 
