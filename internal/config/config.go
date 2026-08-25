@@ -34,6 +34,7 @@ type AppConfig struct {
 	EnableCliOverview           bool
 	EnableBehaviorInstruction   bool
 	EnableOpencodeOverview      bool
+	EnableGh                    bool
 }
 
 func defaultAppConfig() *AppConfig {
@@ -64,6 +65,7 @@ func defaultAppConfig() *AppConfig {
 		EnableCliOverview:           false,
 		EnableBehaviorInstruction:   false,
 		EnableOpencodeOverview:      false,
+		EnableGh:                    false,
 	}
 }
 
@@ -150,6 +152,9 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsBool("ENABLE_OPENCODE_OVERVIEW", func(value bool) {
 		appConfig.EnableOpencodeOverview = value
 	})
+	EnvIsBool("ENABLE_GH", func(value bool) {
+		appConfig.EnableGh = value
+	})
 }
 
 func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
@@ -171,6 +176,7 @@ func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&appConfig.EnableCliOverview, "enable-cli", "L", appConfig.EnableCliOverview, "include cli overview (ENABLE_CLI_OVERVIEW)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.EnableBehaviorInstruction, "enable-behavior", "B", appConfig.EnableBehaviorInstruction, "include behavior instructions (ENABLE_BEHAVIOR_INSTRUCTION)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.EnableOpencodeOverview, "enable-opencode", "O", appConfig.EnableOpencodeOverview, "include opencode overview (ENABLE_OPENCODE_OVERVIEW)")
+	cmd.PersistentFlags().BoolVar(&appConfig.EnableGh, "gh", appConfig.EnableGh, "include gh overview (ENABLE_GH)")
 }
 
 func ParseConfig(

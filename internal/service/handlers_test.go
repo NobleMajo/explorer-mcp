@@ -150,6 +150,12 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	if err := os.Chmod(opencodeStub, 0o755); err != nil {
 		t.Fatal(err)
 	}
+
+	ghStub := filepath.Join(binDir, "gh")
+	testutil.WriteFile(t, ghStub, "#!/bin/sh\nif [ \"$1\" = auth ] && [ \"$2\" = status ]; then exit 0; fi\nif [ \"$1\" = org ] && [ \"$2\" = list ]; then echo ''; exit 0; fi\nif [ \"$1\" = repo ] && [ \"$2\" = list ]; then echo '[{\"name\":\"app\",\"id\":\"1\",\"url\":\"https://github.com/me/app\",\"description\":\"x\"}]'; exit 0; fi\nexit 1\n")
+	if err := os.Chmod(ghStub, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 
 	testutil.WriteFile(t, root+"/main.go", "package main\n")
@@ -195,6 +201,7 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	assertSectionHasField(t, "container", resp.Container, "cliFound")
 	assertSectionHasField(t, "tools", resp.Tools, "toolsFound")
 	assertSectionHasField(t, "cli", resp.CLI, "commonCliToolsFound")
+	assertSectionIsJSONArray(t, "gh", resp.Gh)
 
 	if resp.AgentBehaviorMainInstruction != AgentBehaviorMainInstruction {
 		t.Fatalf("agentBehaviorMainInstruction = %q", resp.AgentBehaviorMainInstruction)
@@ -245,12 +252,12 @@ func TestBuildAgentBehaviorInstructionsMinimal(t *testing.T) {
 	t.Parallel()
 
 	instructions := buildAgentBehaviorInstructions(exploreSections{
-		structure:     mustRawJSON(t, map[string]any{"projectScanDepthLimit": 0}),
-		git:       nil,
-		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
-		dependencies:      mustRawJSON(t, []string{}),
-		container: mustRawJSON(t, map[string]any{}),
-		tools:      mustRawJSON(t, map[string]any{}),
+		structure:    mustRawJSON(t, map[string]any{"projectScanDepthLimit": 0}),
+		git:          nil,
+		workspace:    mustRawJSON(t, map[string]any{"parentScanPerformed": false}),
+		dependencies: mustRawJSON(t, []string{}),
+		container:    mustRawJSON(t, map[string]any{}),
+		tools:        mustRawJSON(t, map[string]any{}),
 	})
 
 	if len(instructions) != 0 {
@@ -424,6 +431,20 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			want: true,
 		},
 		{
+			name:   "gh present",
+			domain: "gh",
+			sect: exploreSections{
+				gh: mustRawJSON(t, []string{"me/app @1 @https://github.com/me/app"}),
+			},
+			want: true,
+		},
+		{
+			name:   "gh omitted",
+			domain: "gh",
+			sect:   exploreSections{},
+			want:   false,
+		},
+		{
 			name:   "unknown domain",
 			domain: "unknown",
 			sect:   exploreSections{},
@@ -499,14 +520,15 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 	t.Parallel()
 
 	sections := exploreSections{
-		structure:     mustRawJSON(t, map[string]any{"projectScanDepthLimit": 6, "entryCount": 1}),
-		git:       mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
-		workspace:  mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
-		dependencies:      mustRawJSON(t, []string{"demo@1.0.0 direct"}),
-		container: mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
-		tools:      mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make-targets": []string{"build"}}}),
-		cli:        mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
-		opencode:   mustRawJSON(t, map[string]any{"permissions": []string{"* '*':allow"}}),
+		structure:    mustRawJSON(t, map[string]any{"projectScanDepthLimit": 6, "entryCount": 1}),
+		git:          mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
+		workspace:    mustRawJSON(t, map[string]any{"parentScanPerformed": true, "siblingProjects": []string{"../other"}}),
+		dependencies: mustRawJSON(t, []string{"demo@1.0.0 direct"}),
+		container:    mustRawJSON(t, map[string]any{"cliFound": []string{"docker"}}),
+		tools:        mustRawJSON(t, map[string]any{"toolsFound": []string{"Makefile"}, "scriptsFound": map[string]any{"make-targets": []string{"build"}}}),
+		cli:          mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
+		opencode:     mustRawJSON(t, map[string]any{"permissions": []string{"* '*':allow"}}),
+		gh:           mustRawJSON(t, []string{"me/app @1 @https://github.com/me/app"}),
 	}
 
 	instructions := buildAgentBehaviorInstructions(sections)
@@ -532,7 +554,7 @@ func TestBuildAgentBehaviorInstructionsSkipsEmptyDomainText(t *testing.T) {
 
 	sections := exploreSections{
 		structure: mustRawJSON(t, map[string]any{"projectScanDepthLimit": 6, "entryCount": 0}),
-		git:   mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
+		git:       mustRawJSON(t, map[string]any{"currentBranchName": "main"}),
 	}
 
 	instructions := buildAgentBehaviorInstructionsWith(sections, catalog)
@@ -795,6 +817,11 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 			settings: exploreSettings{projectScanDepth: 6, enableOpencodeOverview: false},
 			omit:     "opencode",
 		},
+		{
+			name:     "gh",
+			settings: exploreSettings{projectScanDepth: 6, enableGh: false},
+			omit:     "gh",
+		},
 	}
 
 	for _, tc := range tests {
@@ -820,7 +847,7 @@ func TestBuildExploreResponseSkipsBehaviorHintsForUnavailableSections(t *testing
 	t.Setenv("PATH", t.TempDir())
 
 	jsonText, err := buildExploreResponse(root, exploreSettings{
-		projectScanDepth:             6,
+		projectScanDepth:          6,
 		enableBehaviorInstruction: true,
 	})
 	if err != nil {
@@ -879,7 +906,7 @@ func TestBuildExploreResponseOpencodeOmittedWithoutCLI(t *testing.T) {
 
 	jsonText, err := buildExploreResponse(root, exploreSettings{
 		enableOpencodeOverview: true,
-		projectScanDepth:          6,
+		projectScanDepth:       6,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -928,6 +955,123 @@ func TestBuildExploreResponseOpencodePresentWithCLI(t *testing.T) {
 	}
 }
 
+func TestBuildExploreResponseGhDisabledByDefault(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{projectScanDepth: 6})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["gh"]; ok {
+		t.Fatal("expected gh section omitted by default")
+	}
+}
+
+func TestBuildExploreResponseGhOmittedWithoutCLI(t *testing.T) {
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", t.TempDir())
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		enableGh:         true,
+		projectScanDepth: 6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["gh"]; ok {
+		t.Fatal("expected gh omitted when cli not in PATH")
+	}
+}
+
+func TestBuildExploreResponseGhPresentWithCLI(t *testing.T) {
+	binDir := t.TempDir()
+	path := filepath.Join(binDir, "gh")
+	testutil.WriteFile(t, path, "#!/bin/sh\nif [ \"$1\" = auth ] && [ \"$2\" = status ]; then exit 0; fi\nif [ \"$1\" = org ] && [ \"$2\" = list ]; then echo ''; exit 0; fi\nif [ \"$1\" = repo ] && [ \"$2\" = list ]; then echo '[{\"name\":\"app\",\"id\":\"1\",\"url\":\"https://github.com/me/app\",\"description\":\"x\"}]'; exit 0; fi\nexit 1\n")
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", binDir)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		enableGh:                    true,
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["gh"]; !ok {
+		t.Fatal("expected gh section when cli stub in PATH")
+	}
+}
+
+func TestBuildExploreResponseOnlyGhEnabled(t *testing.T) {
+	binDir := t.TempDir()
+	path := filepath.Join(binDir, "gh")
+	testutil.WriteFile(t, path, "#!/bin/sh\nif [ \"$1\" = auth ] && [ \"$2\" = status ]; then exit 0; fi\nif [ \"$1\" = org ] && [ \"$2\" = list ]; then echo ''; exit 0; fi\nif [ \"$1\" = repo ] && [ \"$2\" = list ]; then echo '[{\"name\":\"demo\",\"id\":\"2\",\"url\":\"https://github.com/me/demo\",\"description\":\"\"}]'; exit 0; fi\nexit 1\n")
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+	t.Setenv("PATH", binDir)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+		enableGh:                    true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(resp) != 4 {
+		t.Fatalf("response keys = %v, want meta + gh only", resp)
+	}
+	if _, ok := resp["gh"]; !ok {
+		t.Fatal("expected gh section")
+	}
+	for _, key := range []string{"structure", "git", "workspace", "dependencies", "container", "tools", "cli", "opencode"} {
+		if _, ok := resp[key]; ok {
+			t.Fatalf("expected %q omitted", key)
+		}
+	}
+}
+
 func TestBuildExploreResponseAllOverviewsDisabledReturnsError(t *testing.T) {
 	root := t.TempDir()
 	_, err := buildExploreResponse(root, exploreSettings{
@@ -959,7 +1103,7 @@ func TestBuildExploreResponseOmitsUnavailableSections(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	for _, key := range []string{"git", "container"} {
+	for _, key := range []string{"git", "container", "gh"} {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("expected %q omitted when unavailable", key)
 		}
@@ -984,7 +1128,7 @@ func TestBuildExploreResponseCliDisabledByDefault(t *testing.T) {
 	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
-		projectScanDepth:     6,
+		projectScanDepth:  6,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -1053,7 +1197,7 @@ func TestBuildExploreResponseDisableStructureOverview(t *testing.T) {
 
 	jsonText, err := buildExploreResponse(root, exploreSettings{
 		disableStructureOverview: true,
-		projectScanDepth:            6,
+		projectScanDepth:         6,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -1076,7 +1220,7 @@ func TestBuildExploreResponseBehaviorDisabledByDefault(t *testing.T) {
 	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
-		projectScanDepth:     0,
+		projectScanDepth:  0,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -1111,7 +1255,7 @@ func TestBuildExploreResponseDisabledScansOmitArrays(t *testing.T) {
 	jsonText, err := buildExploreResponse(root, exploreSettings{
 		recentCommitCount: 0,
 		parentScanDepth:   0,
-		projectScanDepth:     0,
+		projectScanDepth:  0,
 	})
 	if err != nil {
 		t.Fatalf("buildExploreResponse() error: %v", err)
@@ -1193,7 +1337,7 @@ tool golang.org/x/tools/cmd/goimports
 	testutil.Chdir(t, root)
 
 	jsonText, err := buildExploreResponse(root, exploreSettings{
-		showGoToolDeps: true,
+		showGoToolDeps:   true,
 		projectScanDepth: 6,
 	})
 	if err != nil {
@@ -1228,7 +1372,7 @@ tool golang.org/x/tools/cmd/goimports
 	testutil.Chdir(t, root)
 
 	jsonText, err := buildExploreResponse(root, exploreSettings{
-		showGoToolDeps: false,
+		showGoToolDeps:   false,
 		projectScanDepth: 6,
 	})
 	if err != nil {
@@ -1310,13 +1454,14 @@ const testProjectScanDepthForHandlers = 7
 
 func testExploreSettingsAllSections(verbose bool) exploreSettings {
 	return exploreSettings{
-		verbose:                     verbose,
-		recentCommitCount:           10,
-		parentScanDepth:             3,
-		projectScanDepth:            7,
-		showGoToolDeps:              true,
-		enableCliOverview:           true,
-		enableOpencodeOverview:      true,
-		enableBehaviorInstruction:   true,
+		verbose:                   verbose,
+		recentCommitCount:         10,
+		parentScanDepth:           3,
+		projectScanDepth:          7,
+		showGoToolDeps:            true,
+		enableCliOverview:         true,
+		enableOpencodeOverview:    true,
+		enableGh:                  true,
+		enableBehaviorInstruction: true,
 	}
 }

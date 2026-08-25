@@ -58,6 +58,19 @@ func TestHasEnabledOverview(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "only gh enabled",
+			s: exploreSettings{
+				disableStructureOverview:    true,
+				disableGitOverview:          true,
+				disableWorkspaceOverview:    true,
+				disableDependenciesOverview: true,
+				disableContainerOverview:    true,
+				disableToolsOverview:        true,
+				enableGh:                    true,
+			},
+			want: true,
+		},
+		{
 			name: "only structure enabled",
 			s: exploreSettings{
 				disableGitOverview:          true,
@@ -101,6 +114,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		DisableToolsOverview:        true,
 		EnableCliOverview:           true,
 		EnableOpencodeOverview:      true,
+		EnableGh:                    true,
 	}
 
 	settings := exploreSettingsFromConfig(cfg)
@@ -121,7 +135,8 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.disableContainerOverview != cfg.DisableContainerOverview ||
 		settings.disableToolsOverview != cfg.DisableToolsOverview ||
 		settings.enableCliOverview != cfg.EnableCliOverview ||
-		settings.enableOpencodeOverview != cfg.EnableOpencodeOverview {
+		settings.enableOpencodeOverview != cfg.EnableOpencodeOverview ||
+		settings.enableGh != cfg.EnableGh {
 		t.Fatalf("exploreSettingsFromConfig() = %+v, want mapped fields from cfg", settings)
 	}
 
@@ -165,6 +180,9 @@ func TestExploreSettingsFromConfigNil(t *testing.T) {
 	}
 	if settings.enableOpencodeOverview {
 		t.Fatal("expected opencode disabled by default")
+	}
+	if settings.enableGh {
+		t.Fatal("expected gh disabled by default")
 	}
 	if !settings.showGoToolDeps {
 		t.Fatal("expected showGoToolDeps true for nil config")

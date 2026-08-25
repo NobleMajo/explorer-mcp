@@ -244,6 +244,43 @@ func TestParseConfigEnableOpencodeOverviewEnv(t *testing.T) {
 	}
 }
 
+func TestParseConfigEnableGhFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "--gh"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableGh {
+		t.Fatal("expected EnableGh true")
+	}
+}
+
+func TestParseConfigEnableGhEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("ENABLE_GH", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableGh {
+		t.Fatal("expected ENABLE_GH env to enable gh overview")
+	}
+}
+
+func TestParseConfigEnableGhDefault(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.EnableGh {
+		t.Fatal("expected EnableGh false by default")
+	}
+}
+
 func TestParseConfigShowGoToolDepsFlag(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })
