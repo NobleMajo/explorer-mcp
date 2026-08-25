@@ -23,8 +23,8 @@ func TestValidateRealWorkspaceManifests(t *testing.T) {
 			loader: LoadBunLockManifest,
 			tag:    "@bun",
 			contains: []string{
-				"cprox@^1.9.39 direct",
-				"zod@^4.1.12 direct",
+				"cprox@^1.9.39 dev",
+				"zod@^4.4.3 direct",
 				"prettier@3.6.2 dev",
 				"typescript@^5 direct",
 			},
@@ -119,7 +119,7 @@ func TestValidateManifestOutputFormat(t *testing.T) {
 			want:    []string{"lodash@4.17.21 direct", "@std/testing@^1.0.0 dev"},
 		},
 		"deno.jsonc": {
-			loader:  LoadDenoManifest,
+			loader: LoadDenoManifest,
 			content: `{
   // imports
   "imports": { "lodash": "npm:lodash@4.17.21" },
