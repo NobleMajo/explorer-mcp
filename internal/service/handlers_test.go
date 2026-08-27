@@ -163,6 +163,7 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	testutil.WriteFile(t, root+"/Makefile", "build:\n\ntest:\n")
 	testutil.WriteFile(t, root+"/Dockerfile", "FROM alpine\n")
 	testutil.WriteFile(t, root+"/requirements.txt", "requests==2.28.0\n")
+	testutil.WriteFile(t, root+"/AGENTS.md", "# agents\n")
 
 	testutil.Chdir(t, root)
 
@@ -202,6 +203,20 @@ func TestExploreCombinesToolSections(t *testing.T) {
 	assertSectionHasField(t, "tools", resp.Tools, "toolsFound")
 	assertSectionHasField(t, "cli", resp.CLI, "commonCliToolsFound")
 	assertSectionIsJSONArray(t, "gh", resp.Gh)
+	assertSectionIsJSONArray(t, "agentc", resp.Agentc)
+
+	var agentcPaths []string
+	if err := json.Unmarshal(resp.Agentc, &agentcPaths); err != nil {
+		t.Fatalf("unmarshal agentc: %v", err)
+	}
+	if !slices.Contains(agentcPaths, "AGENTS.md") {
+		t.Fatalf("agentc paths = %v, want AGENTS.md", agentcPaths)
+	}
+	for _, path := range agentcPaths {
+		if strings.Contains(path, "# agents") {
+			t.Fatalf("agentc must list paths only, got content-like %q", path)
+		}
+	}
 
 	if resp.AgentBehaviorMainInstruction != AgentBehaviorMainInstruction {
 		t.Fatalf("agentBehaviorMainInstruction = %q", resp.AgentBehaviorMainInstruction)
@@ -445,6 +460,28 @@ func TestShouldIncludeBehaviorHint(t *testing.T) {
 			want:   false,
 		},
 		{
+			name:   "agentc present",
+			domain: "agentc",
+			sect: exploreSections{
+				agentc: mustRawJSON(t, []string{"AGENTS.md"}),
+			},
+			want: true,
+		},
+		{
+			name:   "agentc empty array",
+			domain: "agentc",
+			sect: exploreSections{
+				agentc: mustRawJSON(t, []string{}),
+			},
+			want: false,
+		},
+		{
+			name:   "agentc omitted",
+			domain: "agentc",
+			sect:   exploreSections{},
+			want:   false,
+		},
+		{
 			name:   "unknown domain",
 			domain: "unknown",
 			sect:   exploreSections{},
@@ -529,6 +566,7 @@ func TestBuildAgentBehaviorInstructions(t *testing.T) {
 		cli:          mustRawJSON(t, map[string]any{"commonCliToolsFound": []string{"git"}}),
 		opencode:     mustRawJSON(t, map[string]any{"permissions": []string{"* '*':allow"}}),
 		gh:           mustRawJSON(t, []string{"me/app @1 @https://github.com/me/app"}),
+		agentc:       mustRawJSON(t, []string{"AGENTS.md"}),
 	}
 
 	instructions := buildAgentBehaviorInstructions(sections)
@@ -781,6 +819,7 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 		name     string
 		settings exploreSettings
 		omit     string
+		setup    func(t *testing.T, root string)
 	}{
 		{
 			name:     "structure",
@@ -822,6 +861,15 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 			settings: exploreSettings{projectScanDepth: 6, enableGh: false},
 			omit:     "gh",
 		},
+		{
+			name:     "agentc",
+			settings: exploreSettings{projectScanDepth: 6, enableAgentc: false},
+			omit:     "agentc",
+			setup: func(t *testing.T, root string) {
+				t.Helper()
+				testutil.WriteFile(t, root+"/AGENTS.md", "# agents\n")
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -829,6 +877,9 @@ func TestBuildExploreResponseDisableOverviewFlags(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			testutil.WriteFile(t, root+"/main.go", "package main\n")
+			if tc.setup != nil {
+				tc.setup(t, root)
+			}
 			testutil.Chdir(t, root)
 
 			jsonText, err := buildExploreResponse(root, tc.settings)
@@ -1065,7 +1116,110 @@ func TestBuildExploreResponseOnlyGhEnabled(t *testing.T) {
 	if _, ok := resp["gh"]; !ok {
 		t.Fatal("expected gh section")
 	}
-	for _, key := range []string{"structure", "git", "workspace", "dependencies", "container", "tools", "cli", "opencode"} {
+	for _, key := range []string{"structure", "git", "workspace", "dependencies", "container", "tools", "cli", "opencode", "agentc"} {
+		if _, ok := resp[key]; ok {
+			t.Fatalf("expected %q omitted", key)
+		}
+	}
+}
+
+func TestBuildExploreResponseAgentcDisabledByDefault(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	testutil.WriteFile(t, root+"/AGENTS.md", "# agents\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{projectScanDepth: 6})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["agentc"]; ok {
+		t.Fatal("expected agentc section omitted by default")
+	}
+}
+
+func TestBuildExploreResponseAgentcOmittedWithoutFiles(t *testing.T) {
+	root := t.TempDir()
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		enableAgentc:     true,
+		projectScanDepth: 6,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["agentc"]; ok {
+		t.Fatal("expected agentc omitted when no agent context files exist")
+	}
+}
+
+func TestBuildExploreResponseAgentcPresentWithFiles(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/AGENTS.md", "# agents\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		enableAgentc:                true,
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if _, ok := resp["agentc"]; !ok {
+		t.Fatal("expected agentc section when agent context files exist")
+	}
+}
+
+func TestBuildExploreResponseOnlyAgentcEnabled(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/AGENTS.md", "# agents\n")
+	testutil.Chdir(t, root)
+
+	jsonText, err := buildExploreResponse(root, exploreSettings{
+		disableStructureOverview:    true,
+		disableGitOverview:          true,
+		disableWorkspaceOverview:    true,
+		disableDependenciesOverview: true,
+		disableContainerOverview:    true,
+		disableToolsOverview:        true,
+		enableAgentc:                true,
+	})
+	if err != nil {
+		t.Fatalf("buildExploreResponse() error: %v", err)
+	}
+
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(resp) != 4 {
+		t.Fatalf("response keys = %v, want meta + agentc only", resp)
+	}
+	if _, ok := resp["agentc"]; !ok {
+		t.Fatal("expected agentc section")
+	}
+	for _, key := range []string{"structure", "git", "workspace", "dependencies", "container", "tools", "cli", "opencode", "gh"} {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("expected %q omitted", key)
 		}
@@ -1103,7 +1257,7 @@ func TestBuildExploreResponseOmitsUnavailableSections(t *testing.T) {
 	if err := json.Unmarshal([]byte(jsonText), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	for _, key := range []string{"git", "container", "gh"} {
+	for _, key := range []string{"git", "container", "gh", "agentc"} {
 		if _, ok := resp[key]; ok {
 			t.Fatalf("expected %q omitted when unavailable", key)
 		}
@@ -1462,6 +1616,7 @@ func testExploreSettingsAllSections(verbose bool) exploreSettings {
 		enableCliOverview:         true,
 		enableOpencodeOverview:    true,
 		enableGh:                  true,
+		enableAgentc:              true,
 		enableBehaviorInstruction: true,
 	}
 }

@@ -281,6 +281,43 @@ func TestParseConfigEnableGhDefault(t *testing.T) {
 	}
 }
 
+func TestParseConfigEnableAgentcFlag(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print", "--agentc"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableAgentc {
+		t.Fatal("expected EnableAgentc true")
+	}
+}
+
+func TestParseConfigEnableAgentcEnv(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	t.Setenv("ENABLE_AGENTC", "true")
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if !cfg.EnableAgentc {
+		t.Fatal("expected ENABLE_AGENTC env to enable agentc overview")
+	}
+}
+
+func TestParseConfigEnableAgentcDefault(t *testing.T) {
+	oldArgs := os.Args
+	t.Cleanup(func() { os.Args = oldArgs })
+
+	os.Args = []string{"explorer-mcp", "print"}
+	cfg := ParseConfig("Demo", "demo", "1.0.0", "abc")
+
+	if cfg.EnableAgentc {
+		t.Fatal("expected EnableAgentc false by default")
+	}
+}
+
 func TestParseConfigShowGoToolDepsFlag(t *testing.T) {
 	oldArgs := os.Args
 	t.Cleanup(func() { os.Args = oldArgs })

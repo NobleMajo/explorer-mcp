@@ -71,6 +71,19 @@ func TestHasEnabledOverview(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "only agentc enabled",
+			s: exploreSettings{
+				disableStructureOverview:    true,
+				disableGitOverview:          true,
+				disableWorkspaceOverview:    true,
+				disableDependenciesOverview: true,
+				disableContainerOverview:    true,
+				disableToolsOverview:        true,
+				enableAgentc:                true,
+			},
+			want: true,
+		},
+		{
 			name: "only structure enabled",
 			s: exploreSettings{
 				disableGitOverview:          true,
@@ -115,6 +128,7 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		EnableCliOverview:           true,
 		EnableOpencodeOverview:      true,
 		EnableGh:                    true,
+		EnableAgentc:                true,
 	}
 
 	settings := exploreSettingsFromConfig(cfg)
@@ -136,7 +150,8 @@ func TestExploreSettingsFromConfigMapsFields(t *testing.T) {
 		settings.disableToolsOverview != cfg.DisableToolsOverview ||
 		settings.enableCliOverview != cfg.EnableCliOverview ||
 		settings.enableOpencodeOverview != cfg.EnableOpencodeOverview ||
-		settings.enableGh != cfg.EnableGh {
+		settings.enableGh != cfg.EnableGh ||
+		settings.enableAgentc != cfg.EnableAgentc {
 		t.Fatalf("exploreSettingsFromConfig() = %+v, want mapped fields from cfg", settings)
 	}
 
@@ -183,6 +198,9 @@ func TestExploreSettingsFromConfigNil(t *testing.T) {
 	}
 	if settings.enableGh {
 		t.Fatal("expected gh disabled by default")
+	}
+	if settings.enableAgentc {
+		t.Fatal("expected agentc disabled by default")
 	}
 	if !settings.showGoToolDeps {
 		t.Fatal("expected showGoToolDeps true for nil config")

@@ -35,6 +35,7 @@ type AppConfig struct {
 	EnableBehaviorInstruction   bool
 	EnableOpencodeOverview      bool
 	EnableGh                    bool
+	EnableAgentc                bool
 }
 
 func defaultAppConfig() *AppConfig {
@@ -66,6 +67,7 @@ func defaultAppConfig() *AppConfig {
 		EnableBehaviorInstruction:   false,
 		EnableOpencodeOverview:      false,
 		EnableGh:                    false,
+		EnableAgentc:                false,
 	}
 }
 
@@ -155,6 +157,9 @@ func loadEnvVars(appConfig *AppConfig) {
 	EnvIsBool("ENABLE_GH", func(value bool) {
 		appConfig.EnableGh = value
 	})
+	EnvIsBool("ENABLE_AGENTC", func(value bool) {
+		appConfig.EnableAgentc = value
+	})
 }
 
 func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
@@ -177,6 +182,7 @@ func applyExploreFlags(appConfig *AppConfig, cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVarP(&appConfig.EnableBehaviorInstruction, "enable-behavior", "B", appConfig.EnableBehaviorInstruction, "include behavior instructions (ENABLE_BEHAVIOR_INSTRUCTION)")
 	cmd.PersistentFlags().BoolVarP(&appConfig.EnableOpencodeOverview, "enable-opencode", "O", appConfig.EnableOpencodeOverview, "include opencode overview (ENABLE_OPENCODE_OVERVIEW)")
 	cmd.PersistentFlags().BoolVar(&appConfig.EnableGh, "gh", appConfig.EnableGh, "include gh overview (ENABLE_GH)")
+	cmd.PersistentFlags().BoolVar(&appConfig.EnableAgentc, "agentc", appConfig.EnableAgentc, "include agent context paths overview (ENABLE_AGENTC)")
 }
 
 func ParseConfig(

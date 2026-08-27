@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/NobleMajo/explorer-mcp/internal/jsonresp"
+	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/agentc"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/cli"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/container"
 	"github.com/NobleMajo/explorer-mcp/internal/service/overviews/deps"
@@ -51,7 +52,7 @@ var exploreToolInputSchema = func() *jsonschema.Schema {
 func registerExploreTool(server *mcpsdk.Server, settings exploreSettings) {
 	mcpsdk.AddTool(server, &mcpsdk.Tool{
 		Name:        "explore",
-		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, gh, agentBehaviorMainInstruction, and agentBehaviorInstructions",
+		Description: "Workspace overview as JSON with structure, git, workspace, dependencies, container, tools, cli, opencode, gh, agentc, agentBehaviorMainInstruction, and agentBehaviorInstructions",
 		Annotations: readOnlyToolAnnotations,
 		InputSchema: exploreToolInputSchema,
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest, input exploreToolInput) (*mcpsdk.CallToolResult, any, error) {
@@ -87,6 +88,7 @@ var AgentBehaviorInstructions = map[string]string{
 	"git":       "When requested to recommend commits or perform a commit operation, always group uncommitted changes into distinct, logical atomic commits. For each proposed commit, provide exactly 3 structured commit message variants and a clear description of the specific changes. NEVER execute a commit autonomously unless explicitly and directly instructed to do so.",
 	"opencode":  "If OpenCode permissions are present, give preference to 'Allow' over 'Ask'. Always order commands, subcommands, flags and arguments in the permitted way. If a prompt relates to an existing MCP server, use read-only operations such as 'docs' and 'explore' to gain more context before starting the task.",
 	"gh":        "only use the gh cli tool for spesific github insturctions. dont use gh in any other task not mentioning github",
+	"agentc":    "Read the listed agent context files before changing project conventions or inventing new workflows. Prefer existing instructions over assumptions.",
 	"parent":    "Scan parent and sibling directories to identify external dependencies, architectural services, cross-project tools, or related microservices that reside adjacent to the current workspace root directory.",
 	"structure": "Strict adherence to the established project layout is mandatory. Do not alter the directory schema unless the requested feature explicitly forces a deviation from current file and folder patterns. Analyze the existing codebase layout to derive and follow local structural conventions and architectural design patterns. Entries ending in /** mark directories that contain additional files or subdirectories below projectScanDepthLimit; treat them as proof that deeper layout exists even though those paths are not listed.",
 	"tools":     "Analyze and inventory existing tooling configurations for testing, linting, building, executing, and container orchestration. Prioritize utilizing predefined Makefile targets, local scripts, and existing automation tools over generating new standalone commands or chaining raw shell operations.",
@@ -104,6 +106,7 @@ type exploreResponse struct {
 	CLI                          json.RawMessage   `json:"cli,omitempty"`
 	Opencode                     json.RawMessage   `json:"opencode,omitempty"`
 	Gh                           json.RawMessage   `json:"gh,omitempty"`
+	Agentc                       json.RawMessage   `json:"agentc,omitempty"`
 	AgentBehaviorMainInstruction string            `json:"agentBehaviorMainInstruction,omitempty"`
 	AgentBehaviorInstructions    map[string]string `json:"agentBehaviorInstructions,omitempty"`
 }
@@ -204,6 +207,11 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		return "", err
 	}
 
+	agentcOverview, err := runSection("agentc", !settings.enableAgentc, agentc.AgentcOverview)
+	if err != nil {
+		return "", err
+	}
+
 	sections := exploreSections{
 		structure:    repoStructure,
 		git:          gitOverview,
@@ -214,6 +222,7 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		cli:          cliOverview,
 		opencode:     opencodeOverview,
 		gh:           ghOverview,
+		agentc:       agentcOverview,
 	}
 
 	response := exploreResponse{
@@ -231,6 +240,7 @@ func buildExploreResponse(projectRootPath string, settings exploreSettings) (str
 		CLI:             sections.cli,
 		Opencode:        sections.opencode,
 		Gh:              sections.gh,
+		Agentc:          sections.agentc,
 	}
 
 	if settings.enableBehaviorInstruction {
@@ -251,6 +261,7 @@ var agentBehaviorInstructionDomains = []string{
 	"cli",
 	"opencode",
 	"gh",
+	"agentc",
 }
 
 func buildAgentBehaviorInstructions(sections exploreSections) map[string]string {
@@ -284,6 +295,7 @@ type exploreSections struct {
 	cli          json.RawMessage
 	opencode     json.RawMessage
 	gh           json.RawMessage
+	agentc       json.RawMessage
 }
 
 func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool {
@@ -327,6 +339,9 @@ func shouldIncludeBehaviorHint(domainName string, sections exploreSections) bool
 		return len(sections.opencode) > 0
 	case "gh":
 		return len(sections.gh) > 0
+	case "agentc":
+		var paths []string
+		return json.Unmarshal(sections.agentc, &paths) == nil && len(paths) > 0
 	default:
 		return false
 	}

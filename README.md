@@ -24,7 +24,7 @@ explorer-mcp is a lightweight, MCP server that gives AI quick read-only access t
 `explorer-mcp` collects different resources and provides them to the requesting AI Agent.
 
 Resources can be enabled or disabled via CLI flags and environment variables. See `explorer-mcp -h` or `explorer-mcp print -h`.
-Some resources are omitted at runtime when prerequisites are missing (no git repo, no container CLI, no `opencode` binary, no `gh`, etc.).
+Some resources are omitted at runtime when prerequisites are missing (no git repo, no container CLI, no `opencode` binary, no `gh`, no agent context files, etc.).
 
 ### Enabled by default
 
@@ -40,6 +40,7 @@ Some resources are omitted at runtime when prerequisites are missing (no git rep
 - **cli**: Common CLI tools available in PATH. This could mislead an AI agent and cause complications.
 - **opencode**: Effective OpenCode permission rules and MCP server names via `opencode debug agent build`
 - **gh**: Matching GitHub repos in user and org namespaces via `gh`
+- **agentc**: Existing agent/project instruction file paths (`--agentc` / `ENABLE_AGENTC`). Path-only string array for root files like `AGENTS.md` / `CLAUDE.md` / `CONTRIBUTING.md`, flat `.cursor/rules/*`, and top-level `docs/*.{md,mdx}`; never reads contents. Omitted when disabled or none found.
 - **behavior**: `agentBehaviorMainInstruction` and per-domain `agentBehaviorInstructions` for present sections
 
 Quick help:

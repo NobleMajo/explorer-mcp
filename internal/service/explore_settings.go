@@ -31,6 +31,7 @@ type exploreSettings struct {
 	enableCliOverview           bool
 	enableOpencodeOverview      bool
 	enableGh                    bool
+	enableAgentc                bool
 }
 
 func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
@@ -60,6 +61,7 @@ func exploreSettingsFromConfig(cfg *config.AppConfig) exploreSettings {
 		enableCliOverview:           cfg.EnableCliOverview,
 		enableOpencodeOverview:      cfg.EnableOpencodeOverview,
 		enableGh:                    cfg.EnableGh,
+		enableAgentc:                cfg.EnableAgentc,
 	}
 }
 
@@ -92,5 +94,6 @@ func (s exploreSettings) hasEnabledOverview() bool {
 		!s.disableToolsOverview ||
 		s.enableCliOverview ||
 		s.enableOpencodeOverview ||
-		s.enableGh
+		s.enableGh ||
+		s.enableAgentc
 }
