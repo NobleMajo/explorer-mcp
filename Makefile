@@ -163,7 +163,7 @@ clean: ##@ cleans up generated files and docker cache
 
 .PHONY: run
 run: ##@ runs the main.go file using go run
-	@go run main.go $(ARGS)
+	@go run -buildvcs=false -ldflags=$(PROJECT_BUILD_ARGS) main.go $(ARGS)
 
 .PHONY: build
 build: ##@ uses go to build the app with build args
