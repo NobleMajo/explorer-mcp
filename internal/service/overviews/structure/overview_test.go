@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
+	"github.com/NobleMajo/explorer-mcp/internal/service/workspacescan"
 	"github.com/NobleMajo/explorer-mcp/internal/testutil"
 )
 
@@ -14,6 +15,10 @@ const testProjectScanDepth = 7
 
 func testScanSettings(depth int) ScanSettings {
 	return ScanSettings{Depth: depth}
+}
+
+func walkStructureEntries(root string, settings ScanSettings) ([]string, error) {
+	return workspacescan.WalkTree(root, workspacescan.StructureWalkOptions(root, settings.Depth, settings.OutDirs, settings.DepsDirs))
 }
 
 func TestRepoStructureSkipsIgnoredEntries(t *testing.T) {
@@ -99,9 +104,9 @@ func TestStructureSortOrderAndFilePaths(t *testing.T) {
 	testutil.WriteFile(t, root+"/adir/afile.go", "package a\n")
 	testutil.WriteFile(t, root+"/afile.go", "package a\n")
 
-	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, testScanSettings(testProjectScanDepth), &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, testScanSettings(testProjectScanDepth))
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	if len(entries) != 3 {
@@ -132,9 +137,9 @@ func TestAppendStructureEntriesRespectsMaxDepth(t *testing.T) {
 		testutil.WriteFile(t, deep+"/file.go", "package x\n")
 	}
 
-	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: maxDepth}, &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, ScanSettings{Depth: maxDepth})
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	gotMaxDepth := 0
@@ -165,9 +170,9 @@ func TestAppendStructureEntriesMarksDeeperDirectories(t *testing.T) {
 	testutil.WriteFile(t, root+"/internal/service/overviews/structure/overview.go", "package structure\n")
 	testutil.WriteFile(t, root+"/internal/config/config.go", "package config\n")
 
-	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: maxDepth}, &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, ScanSettings{Depth: maxDepth})
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	for _, want := range []string{
@@ -192,9 +197,9 @@ func TestAppendStructureEntriesOmitsMarkerForEmptyDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, ScanSettings{Depth: 2}, &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, ScanSettings{Depth: 2})
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	for _, path := range entries {
@@ -373,10 +378,10 @@ func TestAppendStructureEntriesCollapseOutDirAtDepthLimit(t *testing.T) {
 	testutil.WriteFile(t, root+"/src/dist/nested/build.js", "x\n")
 	testutil.WriteFile(t, root+"/src/app.go", "package app\n")
 
-	entries := make([]string, 0)
 	settings := ScanSettings{Depth: maxDepth}
-	if err := appendStructureEntries(root, root, 0, settings, &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, settings)
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	if !slices.Contains(entries, "src/app.go") {
@@ -387,29 +392,6 @@ func TestAppendStructureEntriesCollapseOutDirAtDepthLimit(t *testing.T) {
 	}
 	if slices.Contains(entries, "src/**") {
 		t.Fatalf("expected src expanded until out dir, got %v", entries)
-	}
-}
-
-func TestIsOutputDirAndIsDepsDir(t *testing.T) {
-	t.Parallel()
-
-	for _, name := range []string{"dist", "out", "output"} {
-		if !isOutputDir(name) {
-			t.Fatalf("expected %q to be output dir", name)
-		}
-	}
-	for _, name := range []string{"node_modules", "vendor"} {
-		if !isDepsDir(name) {
-			t.Fatalf("expected %q to be deps dir", name)
-		}
-	}
-	for _, name := range []string{"build", "dist-extra", "myout", "src", "node_module"} {
-		if isOutputDir(name) {
-			t.Fatalf("expected %q not to be output dir", name)
-		}
-		if isDepsDir(name) {
-			t.Fatalf("expected %q not to be deps dir", name)
-		}
 	}
 }
 
@@ -489,9 +471,9 @@ func TestAppendStructureEntriesIncludesIgnoreFiles(t *testing.T) {
 		testutil.WriteFile(t, root+"/"+fileName, "# ignore rules\n")
 	}
 
-	entries := make([]string, 0)
-	if err := appendStructureEntries(root, root, 0, testScanSettings(testProjectScanDepth), &entries); err != nil {
-		t.Fatalf("appendStructureEntries() error: %v", err)
+	entries, err := walkStructureEntries(root, testScanSettings(testProjectScanDepth))
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
 	}
 
 	names := entryBaseNames(entries)
@@ -505,11 +487,67 @@ func TestAppendStructureEntriesIncludesIgnoreFiles(t *testing.T) {
 	}
 }
 
-func TestAppendStructureEntriesMissingDir(t *testing.T) {
-	entries := make([]string, 0)
-	err := appendStructureEntries(t.TempDir(), "/does/not/exist", 0, testScanSettings(testProjectScanDepth), &entries)
+func TestWalkStructureEntriesMissingDir(t *testing.T) {
+	_, err := walkStructureEntries("/does/not/exist", testScanSettings(testProjectScanDepth))
 	if err == nil {
 		t.Fatal("expected error for missing directory")
+	}
+}
+
+func TestRepoStructureStopsOnNestedProjectFlags(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	if err := os.MkdirAll(root+"/packages/sub/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(root+"/packages/sub/.git", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/packages/sub/nested/file.go", "package nested\n")
+
+	entries, err := walkStructureEntries(root, testScanSettings(testProjectScanDepth))
+	if err != nil {
+		t.Fatalf("walkStructureEntries() error: %v", err)
+	}
+
+	assertStructureStopsOnNestedProjectFlags(t, entries)
+}
+
+func TestStructureOverviewStopsOnNestedProjectFlags(t *testing.T) {
+	root := t.TempDir()
+	testutil.WriteFile(t, root+"/main.go", "package main\n")
+	if err := os.MkdirAll(root+"/packages/sub/nested", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(root+"/packages/sub/.git", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	testutil.WriteFile(t, root+"/packages/sub/nested/file.go", "package nested\n")
+	testutil.Chdir(t, root)
+
+	result, err := StructureOverview(testScanSettings(testProjectScanDepth))()(root, false)
+	if err != nil {
+		t.Fatalf("StructureOverview() error: %v", err)
+	}
+
+	resp, ok := result.(repoStructureResponse)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	assertStructureStopsOnNestedProjectFlags(t, resp.Entries)
+}
+
+func assertStructureStopsOnNestedProjectFlags(t *testing.T, entries []string) {
+	t.Helper()
+
+	want := "packages/sub @git"
+	if !slices.Contains(entries, want) {
+		t.Fatalf("expected %q in entries, got %v", want, entries)
+	}
+	for _, forbidden := range []string{"packages/sub/nested/file.go", "packages/sub/nested"} {
+		if slices.Contains(entries, forbidden) {
+			t.Fatalf("expected scan to stop at flagged dir, found %q in %v", forbidden, entries)
+		}
 	}
 }
 
