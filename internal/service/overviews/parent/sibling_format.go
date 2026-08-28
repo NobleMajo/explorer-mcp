@@ -3,25 +3,18 @@ package parent
 import (
 	"strings"
 
-	"github.com/NobleMajo/explorer-mcp/internal/service/globals"
+	"github.com/NobleMajo/explorer-mcp/internal/service/workspacescan"
 )
 
+var siblingFlagOptions = workspacescan.Options{CheckFlags: true}
+
 func formatSiblingProject(absPath, relPath string, subfiles, subdirs []string) string {
-	var b strings.Builder
-	b.WriteString(relPath)
-
-	flags, _ := globals.CollectSiblingProjectFlags(absPath, subfiles, subdirs)
-	for _, flag := range flags {
-		b.WriteString(" ")
-		b.WriteString(flag)
-	}
-
-	return b.String()
+	flags, _ := workspacescan.CollectFlags(siblingFlagOptions, absPath, subfiles, subdirs)
+	return workspacescan.FormatPathWithFlags(relPath, flags)
 }
 
 func hasSiblingProjectFlags(absPath string, subfiles, subdirs []string) bool {
-	flags, err := globals.CollectSiblingProjectFlags(absPath, subfiles, subdirs)
-	return err == nil && len(flags) > 0
+	return workspacescan.HasFlags(siblingFlagOptions, absPath, subfiles, subdirs)
 }
 
 func siblingRelativePath(entry string) string {
